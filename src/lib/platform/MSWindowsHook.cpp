@@ -8,6 +8,7 @@
 #include "platform/MSWindowsHook.h"
 #include "base/DirectionTypes.h"
 #include "base/Log.h"
+#include "base/PointerMetrics.h"
 #include "deskflow/DisplayException.h"
 
 #include <cstring>
@@ -567,7 +568,9 @@ static bool mouseHookHandler(WPARAM wParam, int32_t x, int32_t y, int32_t data)
   case WM_MOUSEMOVE:
     if (g_mode == kHOOK_RELAY_EVENTS) {
       // relay and eat event
-      PostThreadMessage(g_threadID, DESKFLOW_MSG_MOUSE_MOVE, x, y);
+      deskflow::PointerMetrics::observe(deskflow::PointerMetric::WinHookMove);
+      if (!PostThreadMessage(g_threadID, DESKFLOW_MSG_MOUSE_MOVE, x, y))
+        deskflow::PointerMetrics::observe(deskflow::PointerMetric::WinHookPostFailure);
       return true;
     } else if (g_mode == kHOOK_WATCH_JUMP_ZONE) {
       // low level hooks can report bogus mouse positions that are

@@ -13,6 +13,7 @@
 #include "arch/win32/XArchWindows.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "base/PointerMetrics.h"
 #include "base/TMethodJob.h"
 #include "client/Client.h"
 #include "common/Constants.h"
@@ -830,6 +831,12 @@ void MSWindowsComputer::handleSystemEvent(const Event &event)
 {
   MSG *msg = static_cast<MSG *>(event.getData());
   assert(msg != nullptr);
+  if (msg->message == DESKFLOW_MSG_MOUSE_MOVE && deskflow::PointerMetrics::enabled()) {
+    deskflow::PointerMetrics::observe(
+        deskflow::PointerMetric::WinMessageAgeUs, deskflow::PointerMetrics::messageAgeUs(GetTickCount(), msg->time)
+    );
+  }
+  deskflow::PointerMetrics::report();
 
   if (onPreDispatch(msg->hwnd, msg->message, msg->wParam, msg->lParam)) {
     return;
@@ -895,6 +902,7 @@ bool MSWindowsComputer::onPreDispatchPrimary(HWND, UINT message, WPARAM wParam, 
     return onMouseWheel(static_cast<int32_t>(lParam), static_cast<int32_t>(wParam));
 
   case DESKFLOW_MSG_PRE_WARP: {
+    deskflow::PointerMetrics::Scope timing(deskflow::PointerMetric::WinWarpDrainUs);
     // save position to compute delta of next motion
     saveMousePosition(static_cast<int32_t>(wParam), static_cast<int32_t>(lParam));
 
@@ -906,6 +914,8 @@ bool MSWindowsComputer::onPreDispatchPrimary(HWND, UINT message, WPARAM wParam, 
     MSG msg;
     do {
       GetMessage(&msg, nullptr, DESKFLOW_MSG_MOUSE_MOVE, DESKFLOW_MSG_POST_WARP);
+      if (msg.message == DESKFLOW_MSG_MOUSE_MOVE)
+        deskflow::PointerMetrics::observe(deskflow::PointerMetric::WinWarpDiscard);
     } while (msg.message != DESKFLOW_MSG_POST_WARP);
   }
     return true;
@@ -1223,6 +1233,7 @@ bool MSWindowsComputer::onMouseMove(int32_t mx, int32_t my)
   // ignore if the mouse didn't move or if message posted prior
   // to last mark change.
   if (ignore() || (x == 0 && y == 0)) {
+    deskflow::PointerMetrics::observe(deskflow::PointerMetric::WinIgnoredMove);
     return true;
   }
 
@@ -1249,6 +1260,7 @@ bool MSWindowsComputer::onMouseMove(int32_t mx, int32_t my)
     if (-x + bogusZoneSize > m_xCenter - m_x || x + bogusZoneSize > m_x + m_w - m_xCenter ||
         -y + bogusZoneSize > m_yCenter - m_y || y + bogusZoneSize > m_y + m_h - m_yCenter) {
 
+      deskflow::PointerMetrics::observe(deskflow::PointerMetric::WinBogusMove);
       LOG_DEBUG("dropped bogus delta motion: %+d,%+d", x, y);
     } else {
       // send motion
@@ -1332,6 +1344,7 @@ bool MSWindowsComputer::onDisplayChange()
 
 void MSWindowsComputer::warpCursorNoFlush(int32_t x, int32_t y)
 {
+  deskflow::PointerMetrics::Scope timing(deskflow::PointerMetric::WinWarpUs);
   // send an event that we can recognize before the mouse warp
   PostThreadMessage(GetCurrentThreadId(), DESKFLOW_MSG_PRE_WARP, x, y);
 

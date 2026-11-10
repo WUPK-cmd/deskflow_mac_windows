@@ -10,6 +10,7 @@
 
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "base/PointerMetrics.h"
 #include "deskflow/DeskflowException.h"
 #include "deskflow/ProtocolUtil.h"
 #include "io/IStream.h"
@@ -289,6 +290,8 @@ void ClientProxy1_0::mouseUp(ButtonID button)
 
 void ClientProxy1_0::mouseMove(int32_t xAbs, int32_t yAbs)
 {
+  deskflow::PointerMetrics::gap(deskflow::PointerMetric::ServerMoveGapUs);
+  deskflow::PointerMetrics::Scope timing(deskflow::PointerMetric::ServerSerializeUs);
   LOG_VERBOSE("send mouse move to \"%s\" %d,%d", getName().c_str(), xAbs, yAbs);
   ProtocolUtil::writef(getStream(), kMsgDMouseMove, xAbs, yAbs);
 }

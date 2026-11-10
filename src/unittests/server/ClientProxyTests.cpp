@@ -196,6 +196,29 @@ void ClientProxyTests::microphoneRequiresPinnedPeerAndOptIn()
 // These formats are frozen because shipped third-party clients parse them byte
 // for byte: Synergy 1.4 through 1.14.1 negotiate 1.4 through 1.7, Barrier and
 // Input Leap negotiate 1.6, and Synergy 1.14.2 onwards and Deskflow negotiate 1.8.
+void ClientProxyTests::pointerPacketsPreserveOrder_data()
+{
+  QTest::addColumn<int>("minor");
+  for (const int minor : {0, 1, 6, 7, 8})
+    QTest::newRow(qPrintable(QString::number(minor))) << minor;
+}
+
+void ClientProxyTests::pointerPacketsPreserveOrder()
+{
+  QFETCH(int, minor);
+  ProxyUnderTest test(minor);
+  test.proxy->mouseMove(100, 200);
+  test.proxy->mouseDown(1);
+  test.proxy->mouseMove(101, 201);
+  test.proxy->mouseUp(1);
+  test.proxy->mouseRelativeMove(-5, 7);
+  QByteArray expected = "DMMV" + QByteArray::fromHex("0064 00c8") + "DMDN" + QByteArray::fromHex("01") + "DMMV" +
+                        QByteArray::fromHex("0065 00c9") + "DMUP" + QByteArray::fromHex("01");
+  if (minor >= 2)
+    expected += "DMRM" + QByteArray::fromHex("fffb 0007");
+  QCOMPARE(test.stream->take(), expected);
+}
+
 void ClientProxyTests::keyDown_data()
 {
   QTest::addColumn<int>("minor");

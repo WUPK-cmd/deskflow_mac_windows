@@ -11,6 +11,7 @@
 #include "arch/ArchException.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "base/PointerMetrics.h"
 #include "common/Settings.h"
 #include "deskflow/ipc/CoreIpc.h"
 #include "mt/Lock.h"
@@ -174,6 +175,7 @@ TCPSocket::JobResult SecureSocket::doRead()
 
 TCPSocket::JobResult SecureSocket::doWrite()
 {
+  deskflow::PointerMetrics::Scope timing(deskflow::PointerMetric::SocketWriteUs);
   using enum JobResult;
 
   // write data
@@ -205,6 +207,7 @@ TCPSocket::JobResult SecureSocket::doWrite()
     } else if (status < 0) {
       return Break;
     } else if (status == 0) {
+      deskflow::PointerMetrics::observe(deskflow::PointerMetric::SocketRetry);
       m_writeRetry = true;
       m_writeRetrySize = bufferSize;
       return New;

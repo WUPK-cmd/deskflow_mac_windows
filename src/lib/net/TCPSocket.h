@@ -145,6 +145,7 @@ private:
   bool m_connected;
   Mutex m_mutex;
   ArchSocket m_socket;
+  uint64_t m_pointerBusySinceUs = 0; // Guarded by m_mutex; diagnostic only.
   IEventQueue *m_events;
   CondVar<bool> m_flushed;
   SocketMultiplexer *m_socketMultiplexer;

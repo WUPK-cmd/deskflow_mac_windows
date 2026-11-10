@@ -11,6 +11,7 @@
 #include "arch/ArchException.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "base/PointerMetrics.h"
 #include "mt/Lock.h"
 #include "net/NetworkAddress.h"
 #include "net/SocketException.h"
@@ -155,6 +156,11 @@ void TCPSocket::write(const void *buffer, uint32_t n)
     // copy data to the output buffer
     wasEmpty = (m_outputBuffer.getSize() == 0);
     m_outputBuffer.write(buffer, n);
+    if (deskflow::PointerMetrics::enabled()) {
+      if (wasEmpty)
+        m_pointerBusySinceUs = deskflow::PointerMetrics::nowUs();
+      deskflow::PointerMetrics::observe(deskflow::PointerMetric::SocketQueuedBytes, m_outputBuffer.getSize());
+    }
 
     // there's data to write
     m_flushed = false;
@@ -348,6 +354,7 @@ TCPSocket::JobResult TCPSocket::doRead()
 
 TCPSocket::JobResult TCPSocket::doWrite()
 {
+  deskflow::PointerMetrics::Scope timing(deskflow::PointerMetric::SocketWriteUs);
   // write data
   uint32_t bufferSize = 0;
   int bytesWrote = 0;
@@ -413,6 +420,11 @@ void TCPSocket::sendEvent(EventTypes type)
 
 void TCPSocket::discardWrittenData(int bytesWrote)
 {
+  if (deskflow::PointerMetrics::enabled() && m_pointerBusySinceUs != 0) {
+    deskflow::PointerMetrics::observe(
+        deskflow::PointerMetric::SocketBusyUs, deskflow::PointerMetrics::nowUs() - m_pointerBusySinceUs
+    );
+  }
   m_outputBuffer.pop(bytesWrote);
   if (m_outputBuffer.getSize() == 0) {
     sendEvent(EventTypes::StreamOutputFlushed);

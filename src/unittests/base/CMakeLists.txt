@@ -52,3 +52,11 @@ create_test(
   SOURCE EventQueueTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/base"
 )
+
+create_test(
+  NAME PointerMetricsTests
+  DEPENDS base
+  LIBS arch ${extra_libs}
+  SOURCE PointerMetricsTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/base"
+)
