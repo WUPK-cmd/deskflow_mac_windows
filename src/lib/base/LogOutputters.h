@@ -56,7 +56,7 @@ message is ignored.
 class FileLogOutputter : public ILogOutputter
 {
 public:
-  explicit FileLogOutputter(const QString &logFile);
+  explicit FileLogOutputter(const QString &logFile, bool pointerAggregatesOnly = false);
   ~FileLogOutputter() override = default;
 
   // ILogOutputter overrides
@@ -68,6 +68,7 @@ public:
 
 private:
   QString m_fileName;
+  bool m_pointerAggregatesOnly;
 };
 
 //! Write log to system log

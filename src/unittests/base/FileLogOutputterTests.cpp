@@ -76,4 +76,19 @@ void FileLogOutputterTests::write_rotatedLogExists_replacesIt()
   QVERIFY(readAll(rotatedFileName()).startsWith(QStringLiteral("second batch\n")));
 }
 
+void FileLogOutputterTests::write_pointerOnlyRejectsOrdinaryMessages()
+{
+  FileLogOutputter outputter(m_fileName, true);
+  const auto valid = QStringLiteral(
+      "[2026-11-10T17:00:00.000] INFO: DF_POINTER_METRICS v=1 monotonic_us=123 cumulative=1 "
+      "win_warp_us={n:1,sum:250,max:250,hist:1,0,0,0,0,0,0,0,0,0,0}"
+  );
+  QVERIFY(outputter.write(LogLevel::Level::Info, QStringLiteral("ordinary opaque message")));
+  QVERIFY(outputter.write(LogLevel::Level::Warning, QStringLiteral("input-related warning")));
+  QVERIFY(outputter.write(LogLevel::Level::Info, valid + QStringLiteral(" unexpected text")));
+  QVERIFY(readAll(m_fileName).isEmpty());
+  QVERIFY(outputter.write(LogLevel::Level::Info, valid));
+  QCOMPARE(readAll(m_fileName), valid + QLatin1Char('\n'));
+}
+
 QTEST_MAIN(FileLogOutputterTests)

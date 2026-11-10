@@ -26,3 +26,7 @@ Classify where a gap first appears: Windows message age/warp, server serializati
 ## Offline validation
 
 PointerMetricsTests covers histogram bounds, atomic concurrency, 1Hz report gate (including contention), message-clock wrap, opt-in environment behavior, and aggregate-only report output. ClientProxyTests adds synthetic absolute/relative/button packet-order checks for protocol versions 1.0, 1.1, 1.6, 1.7, and 1.8. Run the test processes twice with DESKFLOW_POINTER_METRICS=0 and =1; no real input, clipboard, sockets, or active installation is used by these synthetic tests.
+
+## Recording privacy guard
+
+With diagnostics enabled, the core file logger accepts only the strict numeric DF_POINTER_METRICS schema. Ordinary INFO/WARN/ERROR messages are excluded from the recording. Screen-transition console messages also omit boundary coordinates in diagnostic mode. Normal builds with metrics disabled retain normal logging. FileLogOutputterTests verifies rejection of ordinary messages and appended text, and acceptance of a complete aggregate line.

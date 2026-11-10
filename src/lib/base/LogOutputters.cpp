@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include <QFile>
+#include <QRegularExpression>
 #include <QString>
 #include <QTextStream>
 
@@ -116,7 +117,8 @@ SystemLogger::~SystemLogger()
 // FileLogOutputter
 //
 
-FileLogOutputter::FileLogOutputter(const QString &logFile)
+FileLogOutputter::FileLogOutputter(const QString &logFile, bool pointerAggregatesOnly)
+    : m_pointerAggregatesOnly(pointerAggregatesOnly)
 {
   setLogFilename(logFile);
 }
@@ -129,6 +131,15 @@ void FileLogOutputter::setLogFilename(const QString &logFile)
 
 bool FileLogOutputter::write(LogLevel::Level, const QString &message)
 {
+  // Diagnostic recordings accept only our numeric aggregate schema. Ordinary
+  // logs can contain input values even at INFO/WARN and must not enter this file.
+  if (m_pointerAggregatesOnly) {
+    static const QRegularExpression aggregateLine(QStringLiteral(
+        R"(^\[[0-9T:.+\-Z]+\] INFO: DF_POINTER_METRICS v=1 monotonic_us=[0-9]+ cumulative=1(?: [a-z_]+=\{n:[0-9]+,sum:[0-9]+,max:[0-9]+(?:,hist:[0-9,]+)?\})*$)"
+    ));
+    if (!aggregateLine.match(message).hasMatch())
+      return true;
+  }
   QFile file(m_fileName);
   if (!file.open(QFile::WriteOnly | QFile::Append))
     return false;
