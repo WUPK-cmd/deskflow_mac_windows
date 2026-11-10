@@ -10,6 +10,7 @@
 
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "base/PointerMetrics.h"
 #include "common/Settings.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/Computer.h"
@@ -465,7 +466,11 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
 
   assert(m_active != nullptr);
 
-  LOG_INFO("switch from \"%s\" to \"%s\" at %d,%d", getName(m_active).c_str(), getName(dst).c_str(), x, y);
+  if (deskflow::PointerMetrics::enabled()) {
+    LOG_INFO("screen transition (pointer diagnostics)");
+  } else {
+    LOG_INFO("switch from \"%s\" to \"%s\" at %d,%d", getName(m_active).c_str(), getName(dst).c_str(), x, y);
+  }
 
   // stop waiting to switch
   stopSwitch();
