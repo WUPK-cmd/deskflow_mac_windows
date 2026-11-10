@@ -173,7 +173,6 @@ private: // HACK
   bool onMouseWheel(int32_t xDelta, int32_t yDelta);
   bool onScreensaver(bool activated);
   bool onDisplayChange();
-  void onClipboardChange();
 
   // warp cursor without discarding queued events
   void warpCursorNoFlush(int32_t x, int32_t y);
@@ -302,7 +301,6 @@ private:
   // owner and as a link in the clipboard viewer chain.
   HWND m_window = nullptr;
   DWORD m_clipboardSequenceNumber = 0;
-  bool m_ownClipboard = false;
 
   // one desk per desktop and a cond var to communicate with it
   MSWindowsDesks *m_desks = nullptr;

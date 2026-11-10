@@ -337,20 +337,13 @@ bool MSWindowsComputer::setClipboard(ClipboardID, const IClipboard *src)
 
 void MSWindowsComputer::checkClipboards()
 {
-  // if we think we own the clipboard but we don't then somebody
-  // grabbed the clipboard on this computer without us knowing.
-  // tell the server that this computer grabbed the clipboard.
-  //
-  // this works around bugs in the clipboard viewer chain.
-  // sometimes NT will simply never send WM_DRAWCLIPBOARD
-  // messages for no apparent reason and rebooting fixes the
-  // problem.  since we don't want a broken clipboard until the
-  // next reboot we do this double check.  clipboard ownership
-  // won't be reflected on other computers until we leave but at
-  // least the clipboard itself will work.
-  if (m_ownClipboard && !MSWindowsClipboard::isOwnedByDeskflow()) {
-    LOG_DEBUG("clipboard changed: lost ownership and no notification received");
-    m_ownClipboard = false;
+  // Check on notification and on screen exit in case the notification is still queued.
+  const DWORD sequence = GetClipboardSequenceNumber();
+  if (sequence == 0 || sequence == m_clipboardSequenceNumber)
+    return;
+
+  m_clipboardSequenceNumber = sequence;
+  if (!MSWindowsClipboard::isOwnedByDeskflow()) {
     sendClipboardEvent(EventTypes::ClipboardGrabbed, kClipboardClipboard);
     sendClipboardEvent(EventTypes::ClipboardGrabbed, kClipboardSelection);
   }
@@ -936,16 +929,9 @@ bool MSWindowsComputer::onEvent(HWND, UINT msg, WPARAM wParam, LPARAM lParam, LR
 {
   switch (msg) {
 
-  case WM_CLIPBOARDUPDATE: {
-    DWORD clipboardSequenceNumber = GetClipboardSequenceNumber();
-    LOG_DEBUG("clipboard update: sequence number %d, current %d", clipboardSequenceNumber, m_clipboardSequenceNumber);
-
-    if (clipboardSequenceNumber && (clipboardSequenceNumber != m_clipboardSequenceNumber)) {
-      m_clipboardSequenceNumber = clipboardSequenceNumber;
-      onClipboardChange();
-    }
+  case WM_CLIPBOARDUPDATE:
+    checkClipboards();
     return 0; // message processed
-  }
 
   case WM_DISPLAYCHANGE:
     return onDisplayChange();
@@ -1342,23 +1328,6 @@ bool MSWindowsComputer::onDisplayChange()
   }
 
   return true;
-}
-
-void MSWindowsComputer::onClipboardChange()
-{
-  // now notify client that somebody changed the clipboard (unless
-  // we're the owner).
-  if (!MSWindowsClipboard::isOwnedByDeskflow()) {
-    if (m_ownClipboard) {
-      LOG_DEBUG("clipboard changed: lost ownership");
-      m_ownClipboard = false;
-      sendClipboardEvent(EventTypes::ClipboardGrabbed, kClipboardClipboard);
-      sendClipboardEvent(EventTypes::ClipboardGrabbed, kClipboardSelection);
-    }
-  } else if (!m_ownClipboard) {
-    LOG_DEBUG("clipboard changed: %s owned", kAppId);
-    m_ownClipboard = true;
-  }
 }
 
 void MSWindowsComputer::warpCursorNoFlush(int32_t x, int32_t y)
