@@ -104,7 +104,7 @@ private Q_SLOTS:
 
 private:
   void startForegroundProcess(const QStringList &args);
-  void startProcessFromDaemon();
+  void startProcessFromDaemon(const QString &mode);
   void stopForegroundProcess();
   void stopProcessFromDaemon();
   QPair<bool, QString> persistServerConfig() const;
@@ -128,6 +128,8 @@ private:
   QMutex m_processMutex;
   QString m_secureSocketVersion;
   std::optional<ProcessMode> m_lastProcessMode = std::nullopt;
+  quint64 m_serviceRequestId = 0;
+  bool m_serviceStartSent = false;
   QTimer m_retryTimer;
   deskflow::gui::ipc::CoreIpcClient *m_coreIpcClient = nullptr;
   deskflow::gui::ipc::DaemonIpcClient *m_daemonIpcClient = nullptr;

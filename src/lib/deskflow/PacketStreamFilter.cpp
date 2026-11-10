@@ -57,10 +57,12 @@ uint32_t PacketStreamFilter::read(void *buffer, uint32_t n)
 
   // get next packet's size if we've finished with this packet and
   // there's enough data to do so.
-  readPacketSize();
-
-  if (m_inputShutdown && m_size == 0) {
-    m_events->addEvent(Event(EventTypes::StreamInputShutdown, getEventTarget()));
+  if (readPacketSize() && m_inputShutdown && !isReadyNoLock()) {
+    if (m_size != 0 || m_buffer.getSize() != 0) {
+      rejectInput();
+    } else {
+      m_events->addEvent(Event(EventTypes::StreamInputShutdown, getEventTarget()));
+    }
   }
 
   return n;
@@ -68,15 +70,25 @@ uint32_t PacketStreamFilter::read(void *buffer, uint32_t n)
 
 void PacketStreamFilter::write(const void *buffer, uint32_t count)
 {
-  // write the length of the payload
-  uint8_t length[4];
-  length[0] = (uint8_t)((count >> 24) & 0xff);
-  length[1] = (uint8_t)((count >> 16) & 0xff);
-  length[2] = (uint8_t)((count >> 8) & 0xff);
-  length[3] = (uint8_t)(count & 0xff);
-  getStream()->write(length, sizeof(length));
+  if (count == 0)
+    return;
 
-  // write the payload
+  constexpr uint32_t headerSize = 4;
+  constexpr uint32_t smallPayloadSize = 64;
+  uint8_t packet[headerSize + smallPayloadSize];
+  packet[0] = static_cast<uint8_t>(count >> 24);
+  packet[1] = static_cast<uint8_t>(count >> 16);
+  packet[2] = static_cast<uint8_t>(count >> 8);
+  packet[3] = static_cast<uint8_t>(count);
+
+  // Enqueue small input packets in one write so the socket cannot send the header alone.
+  if (count <= smallPayloadSize) {
+    memcpy(packet + headerSize, buffer, count);
+    getStream()->write(packet, headerSize + count);
+    return;
+  }
+
+  getStream()->write(packet, headerSize);
   getStream()->write(buffer, count);
 }
 
@@ -115,16 +127,27 @@ bool PacketStreamFilter::readPacketSize()
     m_buffer.pop(sizeof(buffer));
     m_size =
         ((uint32_t)buffer[0] << 24) | ((uint32_t)buffer[1] << 16) | ((uint32_t)buffer[2] << 8) | (uint32_t)buffer[3];
-    if (m_size > PROTOCOL_MAX_MESSAGE_LENGTH) {
-      m_events->addEvent(Event(EventTypes::StreamInputFormatError, getEventTarget()));
+    if (m_size == 0 || m_size > PROTOCOL_MAX_MESSAGE_LENGTH) {
+      rejectInput();
       return false;
     }
   }
   return true;
 }
 
+void PacketStreamFilter::rejectInput()
+{
+  m_inputFailed = true;
+  m_size = 0;
+  m_buffer.pop(m_buffer.getSize());
+  m_events->addEvent(Event(EventTypes::StreamInputFormatError, getEventTarget()));
+}
+
 bool PacketStreamFilter::readMore()
 {
+  if (m_inputFailed)
+    return false;
+
   // note if we have whole packet
   bool wasReady = isReadyNoLock();
 
@@ -138,7 +161,7 @@ bool PacketStreamFilter::readMore()
     // Note that we can't wait for whole pending data to arrive because it may be huge in
     // case of malicious or erroneous peer.
     if (!readPacketSize()) {
-      break;
+      return false;
     }
 
     n = getStream()->read(buffer, sizeof(buffer));
@@ -162,18 +185,16 @@ void PacketStreamFilter::filterEvent(const Event &event)
   } else if (event.getType() == EventTypes::StreamInputShutdown) {
     // discard this if we have buffered data
     std::scoped_lock lock{m_mutex};
+    if (m_inputFailed)
+      return;
     m_inputShutdown = true;
-    if (m_size != 0) {
-      if (m_buffer.getSize() >= m_size) {
-        // we have a complete packet, so we can process it before
-        // shutting down.
-        return;
-      }
-      // we have a partial packet, but the stream has shut down.
-      // we'll never get the rest of the packet, so we should
-      // signal an error and then shut down.
-      m_events->addEvent(Event(EventTypes::StreamInputFormatError, getEventTarget()));
-      m_size = 0;
+    if (isReadyNoLock()) {
+      // Let the consumer read buffered packets before delivering shutdown.
+      return;
+    }
+    if (m_size != 0 || m_buffer.getSize() != 0) {
+      rejectInput();
+      return;
     }
   }
 

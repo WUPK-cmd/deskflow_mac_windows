@@ -19,14 +19,14 @@ class DaemonIpcClient : public IpcClient
 public:
   explicit DaemonIpcClient(QObject *parent = nullptr);
   void sendLogLevel(const QString &logLevel);
-  void sendConfigFile(const QString &configFile);
-  void sendStartProcess();
+  void sendStartProcess(quint64 requestId, const QString &mode, const QString &configFile);
   void sendStopProcess();
   void sendClearSettings();
   void requestLogPath();
 
 Q_SIGNALS:
   void logPathReceived(const QString &logPath);
+  void startResultReceived(quint64 requestId, bool started);
 
 protected:
   void processCommand(const QString &command, const QStringList &parts) override;

@@ -11,6 +11,8 @@ if(WIN32)
   set(PLATFORM_CODE
     win32/AppUtilWindows.cpp
     win32/AppUtilWindows.h
+    ipc/DaemonIpcServer.cpp
+    ipc/DaemonIpcServer.h
   )
 elseif(UNIX)
   set(PLATFORM_CODE
@@ -64,6 +66,8 @@ add_library(${lib_name} STATIC ${PLATFORM_CODE}
   KeyState.cpp
   KeyState.h
   MouseTypes.h
+  Microphone.cpp
+  Microphone.h
   OptionTypes.h
   PacketStreamFilter.cpp
   PacketStreamFilter.h
@@ -81,8 +85,6 @@ add_library(${lib_name} STATIC ${PLATFORM_CODE}
   KeyboardLayoutManager.h
   ipc/IpcServer.cpp
   ipc/IpcServer.h
-  ipc/DaemonIpcServer.cpp
-  ipc/DaemonIpcServer.h
   ipc/CoreIpc.cpp
   ipc/CoreIpc.h
   ipc/CoreIpcServer.cpp
@@ -99,4 +101,12 @@ target_link_libraries(${lib_name}
 
 if(UNIX AND NOT APPLE)
   target_link_libraries(${lib_name} PRIVATE server)
+endif()
+
+if(BUILD_MICROPHONE_FOLLOW)
+  target_compile_definitions(${lib_name} PRIVATE DESKFLOW_MICROPHONE)
+  target_link_libraries(${lib_name} PRIVATE Qt6::Multimedia)
+  if(WIN32)
+    target_link_libraries(${lib_name} PRIVATE ole32)
+  endif()
 endif()

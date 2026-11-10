@@ -33,6 +33,9 @@ Windows will save to the install dir if settings are loaded from there. If not, 
 
 When using settings from the install dir, the service mode will not be available.
 
+On Windows, service mode starts Core with the signed-in user's permissions when the GUI requests it.
+This supports sharing input between signed-in desktops. Windows sign-in and secure UAC screens are outside that session's input permissions.
+
 ## Valid GUI Keys
 
 The GUI config file contains several sections.
@@ -140,7 +143,7 @@ This section contains options used when in server mode it will begin with `[serv
 | clipboardSize      | int > 0           | Deskflow will send a maximum of `N` megabytes of clipboard data to another computer when the mouse transitions to that computer. Clients use the server's value for both sending and receiving.|
 | defaultLockToComputerState| `true` or `false` | When this is true the cursor is locked to the new computer when switching (default: false)|
 | disableLockToComputer| `true` or `false` | If false pressing scroll lock will toggle your cursor to be locked to current computer. (default: false) |
-| enableClipboard    | `true` or `false` | When `true` the clipboard will be shared with all clients If set to ''true'' then clipboard shared and the ''clipboardSharingSize'' setting will be used. If set to false, then clipboard sharing will be disabled and the the ''clipboardSharingSize'' setting will be ignored.|
+| enableClipboard    | `true` or `false` | Shares the clipboard in both directions with connected clients. Enabled by default. Use **Configure Server → Advanced → Enable clipboard sharing** on the server to change this. |
 | enableHeartbeat    | `true` or `false` | Send a heartbeat to connected clients; this has been replaced by internal keep alive (default: false)|
 | enableSwitchDelay  | `true` or `false` | Switching will be delayed by the set value (default: false)|
 | enableSwitchDoubleTap  | `true` or `false` | Enables the doubletap to switch method (default: false)|
@@ -156,6 +159,35 @@ This section contains options used when in server mode it will begin with `[serv
 |win32KeepForeground | `true` or `false` | If set to ''true'' (the default), Deskflow will grab the foreground focus on a Windows server (thereby putting all other windows in the background) upon switching to a client. If set to ''false'', it will leave the currently foreground window in the foreground. Deskflow grabs the focus to avoid issues with other apps interfering with Deskflow's ability to read the hardware inputs. |
 
  - You can use both the ''switchDelay'' and ''switchDoubleTap'' options at the same time. Deskflow will switch when either requirement is satisfied.
+
+### Microphone switching
+
+Build both Windows and macOS with Qt Multimedia and `-DBUILD_MICROPHONE_FOLLOW=ON`. Enable TLS and client fingerprint verification on the Windows server. Connect the Mac and verify each computer's fingerprint against the fingerprint shown on the other computer.
+
+Install a virtual audio cable on each computer. Use VB-CABLE on Windows and BlackHole 2ch on macOS. Leave the physical microphone available to Deskflow and select the virtual input in each app that should follow the pointer. [VB-CABLE](https://vb-audio.com/Cable/) · [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole)
+
+With Deskflow stopped, add the following to the Windows server's `Deskflow.conf`. Use the exact audio device names, the Mac's configured Deskflow computer name, and the Mac's SHA-256 fingerprint.
+
+```ini
+[microphone]
+enabled=true
+input=Microphone Array (Realtek(R) Audio)
+output=CABLE Input (VB-Audio Virtual Cable)
+target=mac-mini
+targetFingerprint=<Mac SHA-256 fingerprint>
+```
+
+On the Mac, add this to `~/Library/Deskflow/Deskflow.conf`.
+
+```ini
+[microphone]
+enabled=true
+output=BlackHole 2ch
+```
+
+Restart Deskflow on both computers. In the Windows app, select **CABLE Output** as the microphone. In the Mac app, select **BlackHole 2ch** as the microphone. Speak while switching screens and check each app's input meter. The Windows app receives audio when the pointer is on Windows, and the Mac app receives audio when the pointer is on the pinned Mac. Audio sent before a switch can take a short time to drain.
+
+Deskflow looks for 48 kHz mono or stereo audio devices. If the device name is incorrect, its log lists the available names. Set `enabled=false` and restart to stop microphone switching. Apps that still select the physical Windows microphone can continue to hear it independently of Deskflow.
 
 ### Computer Settings
 

@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 constexpr static auto s_clipboardChunkMetaSize = 7;
 
@@ -31,7 +32,7 @@ public:
   explicit ClipboardChunk(size_t size);
 
   static ClipboardChunk *start(ClipboardID id, uint32_t sequence, const std::string &size);
-  static ClipboardChunk *data(ClipboardID id, uint32_t sequence, const std::string &data);
+  static ClipboardChunk *data(ClipboardID id, uint32_t sequence, std::string_view data);
   static ClipboardChunk *end(ClipboardID id, uint32_t sequence);
 
   static TransferState assemble(

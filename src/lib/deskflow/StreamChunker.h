@@ -15,8 +15,6 @@ class IEventQueue;
 class StreamChunker
 {
 public:
-  static void sendClipboard(
-      const std::string_view &data, size_t size, ClipboardID id, uint32_t sequence, IEventQueue *events,
-      void *eventTarget
-  );
+  static void
+  sendClipboard(std::string_view data, ClipboardID id, uint32_t sequence, IEventQueue *events, void *eventTarget);
 };

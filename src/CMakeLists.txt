@@ -6,7 +6,6 @@
 add_subdirectory(lib)
 add_subdirectory(apps)
 
-option(BUILD_TESTS "Build tests" ON)
 if(BUILD_TESTS)
   add_subdirectory(unittests)
 endif()

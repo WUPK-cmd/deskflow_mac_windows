@@ -7,12 +7,14 @@
 #pragma once
 
 #include "mt/Thread.h"
+#include "platform/MSWindowsHandle.h"
 #include "platform/MSWindowsProcess.h"
-#include "platform/MSWindowsSession.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -23,7 +25,7 @@ typedef VOID(WINAPI *SendSas)(BOOL asUser);
 class FileLogOutputter;
 
 /**
- * @brief Monitors and controls a core process on Windows, elevating if necessary.
+ * @brief Monitors and controls a core process in the requesting Windows session.
  */
 class MSWindowsWatchdog
 {
@@ -46,9 +48,12 @@ public:
   void startAsync();
 
   /**
-   * @brief Set the command to run and whether to elevate the process.
+   * @brief Set the command and client token, or stop the current child with an empty command.
    */
-  void setProcessConfig(const std::string_view &command, bool elevate);
+  void setProcessConfig(
+      std::wstring command, std::shared_ptr<MSWindowsHandle> token = {}, DWORD sessionId = 0,
+      std::function<void(bool)> onStarted = {}
+  );
 
   /**
    * @brief Stop the main loop and output loop threads.
@@ -71,29 +76,6 @@ private:
    */
   void outputLoop(const void *);
 
-  /**
-   * @brief Duplicates the process token for the given process.
-   *
-   * Required for starting a process in the user session; when we start an elevated process
-   * to ensure that it has access to secure processes, such as the login screen, we duplicate
-   * the token of an existing process that has the necessary access such as `winlogon.exe`.
-   *
-   * @param process The process to duplicate the token from (typically `winlogon.exe`).
-   */
-  HANDLE duplicateProcessToken(HANDLE process, LPSECURITY_ATTRIBUTES security);
-
-  /**
-   * @brief Get a security token for the user session.
-   *
-   * Checks to see if logonui.exe is running or if the `elevatedToken` arg is true,
-   * which indicates either we're in a secure user session or we need an elevated token.
-   * If either case is true, it duplicates the token from `winlogon.exe`.
-   */
-  HANDLE getUserToken(LPSECURITY_ATTRIBUTES security, bool elevatedToken);
-
-  /**
-   * @brief Start the core process, elevating if necessary.
-   */
   void startProcess();
 
   /**
@@ -123,20 +105,16 @@ private:
    */
   static std::string processStateToString(ProcessState state);
 
-  /**
-   * @brief Stops any core processes which were not started by the watchdog.
-   */
-  static void shutdownExistingProcesses();
-
 private:
-  bool m_running = true;
+  std::atomic_bool m_running = true;
   std::unique_ptr<Thread> m_mainThread;
   std::unique_ptr<Thread> m_outputThread;
   std::unique_ptr<Thread> m_sasThread;
   HANDLE m_outputWritePipe = nullptr;
   HANDLE m_outputReadPipe = nullptr;
-  bool m_elevateProcess = false;
-  MSWindowsSession m_session;
+  std::shared_ptr<MSWindowsHandle> m_userToken;
+  DWORD m_sessionId = 0;
+  std::function<void(bool)> m_onStarted;
   int m_startFailures = 0;
   FileLogOutputter &m_fileLogOutputter;
   bool m_foreground = false;

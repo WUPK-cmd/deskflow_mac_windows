@@ -13,9 +13,13 @@ if (OSX_BUNDLE)
   if (APPLE_CODESIGN_DEV)
     set(_codesign_identity "${APPLE_CODESIGN_DEV}")
   endif()
+  if (BUILD_MICROPHONE_FOLLOW)
+    set(_core_deploy_argument "\"-executable=\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/${CMAKE_PROJECT_NAME}-core\"")
+  endif()
   install(CODE "execute_process(COMMAND
     ${DEPLOYQT}
     \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_PROPER_NAME}.app\"
+    ${_core_deploy_argument}
     -hardened-runtime -timestamp \"-codesign=${_codesign_identity}\"
   )")
   set(CPACK_PACKAGE_ICON "${MY_DIR}/dmg-volume.icns")

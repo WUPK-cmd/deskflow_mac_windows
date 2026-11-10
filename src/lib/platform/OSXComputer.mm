@@ -64,7 +64,8 @@ static const double kCarbonLoopWaitTimeout = 10.0;
 // Synthetic mouse button and drag events require event numbers on macOS 27 and later.
 static inline bool needsEventNumber()
 {
-  return NSProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27;
+  static const bool required = NSProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27;
+  return required;
 }
 
 int getSecureInputEventPID();
@@ -463,8 +464,7 @@ void OSXComputer::postMouseEvent(CGPoint &pos) const
 
   int8_t button = m_buttonState.getFirstButtonDown();
   if (button != -1) {
-    MouseButtonEventMapType thisButtonType = MouseButtonEventMap[button];
-    type = thisButtonType[kMouseButtonDragged];
+    type = MouseButtonEventMap[button].at(kMouseButtonDragged);
   }
 
   CGEventRef event = CGEventCreateMouseEvent(nullptr, type, pos, static_cast<CGMouseButton>(button));
@@ -696,30 +696,17 @@ void OSXComputer::enable()
   m_axTimer = m_events->newTimer(1.0, nullptr);
   m_events->addHandler(EventTypes::Timer, m_axTimer, [this](const auto &) { checkAXPermissions(); });
 
-  if (m_isPrimary) {
-    // FIXME -- start watching jump zones
-
-    // kCGEventTapOptionDefault = 0x00000000 (Missing in 10.4, so specified literally)
-    m_eventTapPort = CGEventTapCreate(
-        kCGHIDEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault, kCGEventMaskForAllEvents, handleCGInputEvent,
-        this
-    );
-  } else {
-    // FIXME -- prevent system from entering power save mode
-
+  if (!m_isPrimary) {
+    // A client only injects input. An active tap would send each event back through this process.
     hideCursor();
-
-    // warp the mouse to the cursor center
     fakeMouseMove(m_xCenter, m_yCenter);
-
-    // there may be a better way to do this, but we register an event handler even if we're
-    // not on the primary display (acting as a client). This way, if a local event comes in
-    // (either keyboard or mouse), we can make sure to show the cursor if we've hidden it.
-    m_eventTapPort = CGEventTapCreate(
-        kCGHIDEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault, kCGEventMaskForAllEvents,
-        handleCGInputEventSecondary, this
-    );
+    return;
   }
+
+  m_eventTapPort = CGEventTapCreate(
+      kCGHIDEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault, kCGEventMaskForAllEvents, handleCGInputEvent,
+      this
+  );
 
   if (m_eventTapPort) {
     m_eventTapRLSR = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, m_eventTapPort, 0);
@@ -1648,29 +1635,6 @@ EventHotKeyRef OSXComputer::HotKeyItem::getRef() const
 bool OSXComputer::HotKeyItem::operator<(const HotKeyItem &x) const
 {
   return (m_keycode < x.m_keycode || (m_keycode == x.m_keycode && m_mask < x.m_mask));
-}
-
-// Quartz event tap support for the secondary display. This makes sure that we
-// will show the cursor if a local event comes in while deskflow has the cursor
-// off the computer.
-CGEventRef
-OSXComputer::handleCGInputEventSecondary(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
-{
-  // this fix is really screwing with the correct show/hide behavior. it
-  // should be tested better before reintroducing.
-  return event;
-
-  OSXComputer *computer = (OSXComputer *)refcon;
-  if (computer->m_cursorHidden && type == kCGEventMouseMoved) {
-
-    CGPoint pos = CGEventGetLocation(event);
-    if (pos.x != computer->m_xCenter || pos.y != computer->m_yCenter) {
-
-      LOG_DEBUG("show cursor on secondary, type=%d pos=%d,%d", type, pos.x, pos.y);
-      computer->showCursor();
-    }
-  }
-  return event;
 }
 
 // Quartz event tap support

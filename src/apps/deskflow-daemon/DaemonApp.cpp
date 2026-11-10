@@ -28,10 +28,22 @@
 #endif
 
 #include <QCoreApplication>
-#include <QFileInfo>
+#include <QDir>
+#include <QLocalSocket>
+#include <QPointer>
 #include <QSettings>
 
 using namespace deskflow::core;
+
+namespace {
+
+QSettings daemonSettings(bool foreground)
+{
+  const auto root = foreground ? QStringLiteral("HKEY_CURRENT_USER") : QStringLiteral("HKEY_LOCAL_MACHINE");
+  return QSettings(root + QStringLiteral("\\SOFTWARE\\Deskflow\\Daemon"), QSettings::NativeFormat);
+}
+
+} // namespace
 
 DaemonApp::DaemonApp(IEventQueue &events) : m_events(events)
 {
@@ -43,59 +55,40 @@ DaemonApp::~DaemonApp() = default;
 void DaemonApp::saveLogLevel(const QString &logLevel) const
 {
   LOG_DEBUG("log level changed: %s", logLevel.toUtf8().constData());
-  CLOG->setFilter(logLevel.toUtf8().constData());
-  Settings::setValue(Settings::Daemon::LogLevel, logLevel);
+  if (CLOG->setFilter(logLevel.toUtf8().constData()))
+    daemonSettings(m_foreground).setValue(QStringLiteral("LogLevel"), logLevel);
 }
 
-void DaemonApp::setConfigFile(const QString &configFile)
-{
-  LOG_DEBUG("config file updated: %s", configFile.toUtf8().constData());
-  m_configFile = configFile;
-  Settings::setValue(Settings::Daemon::ConfigFile, configFile);
-}
-
-void DaemonApp::applyWatchdogCommand() const
+void DaemonApp::applyWatchdogCommand(
+    ipc::DaemonIpcServer *server, QLocalSocket *client, const QString &requestId, const QString &mode,
+    const QString &configFile, const std::shared_ptr<MSWindowsHandle> &token, quint32 sessionId
+) const
 {
 #if defined(Q_OS_WIN)
-  if (m_configFile.isEmpty()) {
-    LOG_ERR("cannot apply watchdog command: no config file set");
+  const auto path = QDir::fromNativeSeparators(configFile);
+  if ((mode != QStringLiteral("server") && mode != QStringLiteral("client")) || path.size() <= 3 || path.at(1) != ':' ||
+      path.at(2) != '/' || path.contains('"') || path.contains(QChar(u'\0'))) {
+    LOG_ERR("cannot start core: invalid mode or settings path");
+    server->replyToStart(client, requestId, false);
     return;
   }
 
-  // QFileInfo::exists on a UNC path triggers SMB auth from this SYSTEM-context
-  // process, leaking the machine NTLM hash to whoever controls the remote host.
-  // Any local user can reach this via the IPC pipe, so reject remote paths up front.
-  if (m_configFile.startsWith(QStringLiteral("\\\\")) || m_configFile.startsWith(QStringLiteral("//"))) {
-    LOG_ERR("cannot apply watchdog command: remote config file paths are not allowed: %s", qPrintable(m_configFile));
-    return;
-  }
-
-  if (!QFileInfo::exists(m_configFile)) {
-    LOG_ERR("cannot apply watchdog command: config file does not exist: %s", qPrintable(m_configFile));
-    return;
-  }
-
-  QSettings config(m_configFile, QSettings::IniFormat);
-  const auto coreMode = config.value(Settings::Core::CoreMode).toInt();
-  const auto elevate = config.value(Settings::Daemon::Elevate, !Settings::isPortableMode()).toBool();
-
-  QString modeArg;
-  if (coreMode == Settings::CoreMode::Server) {
-    modeArg = QStringLiteral("server");
-  } else if (coreMode == Settings::CoreMode::Client) {
-    modeArg = QStringLiteral("client");
-  } else {
-    LOG_ERR("cannot apply watchdog command: invalid core mode in config: %d", coreMode);
-    return;
-  }
-
+  // The service does not open the settings file. The child reads it with the caller's token.
   const auto corePath = QStringLiteral("%1/%2").arg(QCoreApplication::applicationDirPath(), kCoreBinName);
-  const auto command = QStringLiteral("\"%1\" %2 --settings \"%3\"").arg(corePath, modeArg, m_configFile).toStdString();
-
-  LOG_DEBUG("applying watchdog command (elevate: %s)", elevate ? "yes" : "no");
-  m_pWatchdog->setProcessConfig(command, elevate);
-#else
-  LOG_ERR("applying watchdog command not implemented on this platform");
+  const auto command = QStringLiteral("\"%1\" %2 --settings \"%3\"").arg(corePath, mode, path).toStdWString();
+  m_pWatchdog->setProcessConfig(
+      command, token, sessionId,
+      [server, client = QPointer(client), requestId](bool started) {
+        QMetaObject::invokeMethod(
+            server,
+            [server, client, requestId, started] {
+              if (client && client->state() == QLocalSocket::ConnectedState)
+                server->replyToStart(client, requestId, started);
+            },
+            Qt::QueuedConnection
+        );
+      }
+  );
 #endif
 }
 
@@ -103,12 +96,8 @@ void DaemonApp::clearWatchdogCommand()
 {
   LOG_DEBUG("clearing watchdog command");
 
-  // Clear the persisted config path so the daemon does not auto-start the core on next boot.
-  m_configFile.clear();
-  Settings::setValue(Settings::Daemon::ConfigFile);
-
 #if defined(Q_OS_WIN)
-  m_pWatchdog->setProcessConfig("", false);
+  m_pWatchdog->setProcessConfig({});
 #else
   LOG_ERR("clearing watchdog command not implemented on this platform");
 #endif
@@ -117,20 +106,20 @@ void DaemonApp::clearWatchdogCommand()
 void DaemonApp::clearSettings()
 {
   LOG_INFO("clearing daemon settings");
-  m_configFile.clear();
-  Settings::setValue(Settings::Daemon::ConfigFile);
-  Settings::setValue(Settings::Daemon::LogFile);
-  Settings::setValue(Settings::Daemon::LogLevel);
+  daemonSettings(m_foreground).remove(QStringLiteral("LogLevel"));
 }
 
-void DaemonApp::connectIpcServer(const ipc::DaemonIpcServer *ipcServer) const
+void DaemonApp::connectIpcServer(ipc::DaemonIpcServer *ipcServer) const
 {
   // Use direct connection as this object is on it's own thread,
   // and so is on a different event loop to the main Qt loop.
   connect(ipcServer, &ipc::DaemonIpcServer::logLevelChanged, this, &DaemonApp::saveLogLevel, Qt::DirectConnection);
-  connect(ipcServer, &ipc::DaemonIpcServer::configFileChanged, this, &DaemonApp::setConfigFile, Qt::DirectConnection);
   connect(
-      ipcServer, &ipc::DaemonIpcServer::startProcessRequested, this, &DaemonApp::applyWatchdogCommand,
+      ipcServer, &ipc::DaemonIpcServer::startRequested, this,
+      [this, ipcServer](
+          QLocalSocket *client, const QString &requestId, const QString &mode, const QString &configFile,
+          const std::shared_ptr<MSWindowsHandle> &token, quint32 sessionId
+      ) { applyWatchdogCommand(ipcServer, client, requestId, mode, configFile, token, sessionId); },
       Qt::DirectConnection
   );
   connect(
@@ -167,13 +156,6 @@ void DaemonApp::run(QThread &daemonThread)
 
 #if defined(Q_OS_WIN)
   m_pWatchdog = std::make_unique<MSWindowsWatchdog>(m_foreground, *m_pFileLogOutputter);
-
-  if (const auto persistedConfig = Settings::value(Settings::Daemon::ConfigFile).toString();
-      !persistedConfig.isEmpty()) {
-    LOG_DEBUG("using last known config file: %s", persistedConfig.toUtf8().constData());
-    m_configFile = persistedConfig;
-    applyWatchdogCommand();
-  }
 #endif
 
   LOG_DEBUG("starting daemon thread");
@@ -236,9 +218,15 @@ int DaemonApp::mainLoop()
   return s_exitSuccess;
 }
 
-QString DaemonApp::logFilename()
+QString DaemonApp::logFilename() const
 {
-  return Settings::value(Settings::Daemon::LogFile).toString();
+  const auto directory = m_foreground ? Settings::UserDir : QCoreApplication::applicationDirPath();
+  return QDir(directory).filePath(QStringLiteral("deskflow-daemon.log"));
+}
+
+QString DaemonApp::logLevel() const
+{
+  return daemonSettings(m_foreground).value(QStringLiteral("LogLevel")).toString();
 }
 
 void DaemonApp::setForeground()
@@ -249,6 +237,8 @@ void DaemonApp::setForeground()
 
 void DaemonApp::initLogging()
 {
+  if (m_foreground)
+    QDir().mkpath(Settings::UserDir);
 #if defined(Q_OS_WIN)
   if (!m_foreground) {
     // Only use MS debug outputter when the process is daemonized, since stdout won't be accessible

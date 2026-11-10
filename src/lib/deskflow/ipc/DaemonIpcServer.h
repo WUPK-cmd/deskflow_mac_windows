@@ -8,10 +8,12 @@
 
 #include "IpcServer.h"
 
+#include <QLocalSocket>
 #include <QObject>
 #include <QString>
+#include <memory>
 
-class QLocalSocket;
+class MSWindowsHandle;
 
 namespace deskflow::core::ipc {
 
@@ -20,15 +22,23 @@ class DaemonIpcServer : public IpcServer
   Q_OBJECT
 
 public:
-  explicit DaemonIpcServer(QObject *parent, const QString &logFilename);
+  explicit DaemonIpcServer(QObject *parent, const QString &logFilename, bool foreground);
+  void replyToStart(QLocalSocket *client, const QString &requestId, bool started) const;
+
+Q_SIGNALS:
+  void startRequested(
+      QLocalSocket *client, const QString &requestId, const QString &mode, const QString &configFile,
+      const std::shared_ptr<MSWindowsHandle> &token, quint32 sessionId
+  );
 
 private:
+  bool authorizeClient(QLocalSocket *clientSocket) const override;
   void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) override;
   void processLogLevel(QLocalSocket *&clientSocket, const QStringList &messageParts);
-  void processConfigFile(QLocalSocket *&clientSocket, const QStringList &messageParts);
+  void processStart(QLocalSocket *clientSocket, const QString &args);
 
-private:
   const QString m_logFilename;
+  const bool m_foreground;
 };
 
 } // namespace deskflow::core::ipc

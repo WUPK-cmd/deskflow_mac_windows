@@ -128,7 +128,6 @@ void SettingsDialog::initConnections() const
   connect(ui->rbAutoHide, &QRadioButton::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->cbPreventSleep, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->rbCloseToTray, &QRadioButton::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
-  connect(ui->cbElevateDaemon, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->cbAutoUpdate, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->cbGuiDebug, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->cbShowVersion, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
@@ -225,7 +224,6 @@ void SettingsDialog::accept()
   Settings::setValue(Settings::Log::Level, ui->comboLogLevel->currentData());
   Settings::setValue(Settings::Log::ToFile, ui->groupLogToFile->isChecked());
   Settings::setValue(Settings::Log::File, ui->lineLogFilename->text());
-  Settings::setValue(Settings::Daemon::Elevate, ui->cbElevateDaemon->isChecked());
   Settings::setValue(Settings::Gui::Autohide, ui->rbAutoHide->isChecked());
   Settings::setValue(Settings::Gui::AutoUpdateCheck, ui->cbAutoUpdate->isChecked());
   Settings::setValue(Settings::Core::PreventSleep, ui->cbPreventSleep->isChecked());
@@ -262,7 +260,6 @@ void SettingsDialog::loadFromConfig()
   ui->groupLogToFile->setChecked(Settings::value(Settings::Log::ToFile).toBool());
   ui->lineLogFilename->setText(Settings::value(Settings::Log::File).toString());
   ui->cbPreventSleep->setChecked(Settings::value(Settings::Core::PreventSleep).toBool());
-  ui->cbElevateDaemon->setChecked(Settings::value(Settings::Daemon::Elevate).toBool());
   ui->cbAutoUpdate->setChecked(Settings::value(Settings::Gui::AutoUpdateCheck).toBool());
   ui->cbGuiDebug->setChecked(Settings::value(Settings::Log::GuiDebug).toBool());
   ui->cbShowVersion->setChecked(Settings::value(Settings::Gui::ShowVersionInTitle).toBool());
@@ -365,7 +362,6 @@ void SettingsDialog::updateKeyLengthOnFile(const QString &path)
 void SettingsDialog::updateControls()
 {
   const bool writable = Settings::isWritable();
-  const bool serviceChecked = ui->groupService->isChecked();
   const bool logToFile = ui->groupLogToFile->isChecked();
 
   ui->sbPort->setEnabled(writable);
@@ -395,7 +391,6 @@ void SettingsDialog::updateControls()
   // Daemon options should only be available on Windows when *not* in portable mode.
   if (!Settings::isPortableMode()) {
     ui->groupService->setEnabled(writable);
-    ui->cbElevateDaemon->setEnabled(writable && serviceChecked);
   } else if (ui->groupService->isVisibleTo(ui->tabAdvanced)) {
     ui->groupService->setVisible(false);
   }
@@ -430,7 +425,6 @@ bool SettingsDialog::isModified() const
       (ui->rbAutoHide->isChecked() != Settings::value(Settings::Gui::Autohide).toBool()) ||
       (ui->cbPreventSleep->isChecked() != Settings::value(Settings::Core::PreventSleep).toBool()) ||
       (ui->rbCloseToTray->isChecked() != Settings::value(Settings::Gui::CloseToTray).toBool()) ||
-      (ui->cbElevateDaemon->isChecked() != Settings::value(Settings::Daemon::Elevate).toBool()) ||
       (ui->cbAutoUpdate->isChecked() != Settings::value(Settings::Gui::AutoUpdateCheck).toBool()) ||
       (ui->cbGuiDebug->isChecked() != Settings::value(Settings::Log::GuiDebug).toBool()) ||
       (ui->cbShowVersion->isChecked() != Settings::value(Settings::Gui::ShowVersionInTitle).toBool()) ||
@@ -465,7 +459,6 @@ bool SettingsDialog::isDefault() const
       (ui->rbAutoHide->isChecked() == Settings::defaultValue(Settings::Gui::Autohide).toBool()) &&
       (ui->cbPreventSleep->isChecked() == Settings::defaultValue(Settings::Core::PreventSleep).toBool()) &&
       (ui->rbCloseToTray->isChecked() == Settings::defaultValue(Settings::Gui::CloseToTray).toBool()) &&
-      (ui->cbElevateDaemon->isChecked() == Settings::defaultValue(Settings::Daemon::Elevate).toBool()) &&
       (ui->cbAutoUpdate->isChecked() == Settings::defaultValue(Settings::Gui::AutoUpdateCheck).toBool()) &&
       (ui->cbGuiDebug->isChecked() == Settings::defaultValue(Settings::Log::GuiDebug).toBool()) &&
       (ui->cbShowVersion->isChecked() == Settings::defaultValue(Settings::Gui::ShowVersionInTitle).toBool()) &&
@@ -493,7 +486,6 @@ void SettingsDialog::resetToDefault()
   ui->groupLogToFile->setChecked(Settings::defaultValue(Settings::Log::ToFile).toBool());
   ui->lineLogFilename->setText(Settings::defaultValue(Settings::Log::File).toString());
   ui->cbPreventSleep->setChecked(Settings::defaultValue(Settings::Core::PreventSleep).toBool());
-  ui->cbElevateDaemon->setChecked(Settings::defaultValue(Settings::Daemon::Elevate).toBool());
   ui->cbAutoUpdate->setChecked(Settings::defaultValue(Settings::Gui::AutoUpdateCheck).toBool());
   ui->cbGuiDebug->setChecked(Settings::defaultValue(Settings::Log::GuiDebug).toBool());
   ui->cbShowVersion->setChecked(Settings::defaultValue(Settings::Gui::ShowVersionInTitle).toBool());

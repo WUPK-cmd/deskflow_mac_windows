@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <QString>
+
 #include <string>
 
 class ClientProxy;
@@ -21,7 +23,9 @@ class IEventQueue;
 class ClientProxyUnknown
 {
 public:
-  ClientProxyUnknown(deskflow::IStream *stream, double timeout, Server *server, IEventQueue *events);
+  ClientProxyUnknown(
+      deskflow::IStream *stream, double timeout, Server *server, IEventQueue *events, QString verifiedFingerprint
+  );
   ClientProxyUnknown(ClientProxyUnknown const &) = delete;
   ClientProxyUnknown(ClientProxyUnknown &&) = delete;
   ~ClientProxyUnknown();
@@ -68,4 +72,5 @@ private:
   bool m_ready = false;
   Server *m_server = nullptr;
   IEventQueue *m_events = nullptr;
+  const QString m_verifiedFingerprint;
 };

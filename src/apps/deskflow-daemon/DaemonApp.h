@@ -8,11 +8,13 @@
 
 #include <QObject>
 #include <QThread>
+#include <memory>
 
 class Event;
 class IEventQueue;
 class FileLogOutputter;
-class QLocalServer;
+class QLocalSocket;
+class MSWindowsHandle;
 class QCoreApplication;
 
 namespace deskflow::core::ipc {
@@ -36,9 +38,10 @@ public:
   void run(QThread &daemonThread);
   void setForeground();
   void initLogging();
-  void connectIpcServer(const deskflow::core::ipc::DaemonIpcServer *ipcServer) const;
+  void connectIpcServer(deskflow::core::ipc::DaemonIpcServer *ipcServer) const;
 
-  static QString logFilename();
+  QString logFilename() const;
+  QString logLevel() const;
 
 private:
   void daemonize();
@@ -46,8 +49,10 @@ private:
   int mainLoop();
   int daemonLoop();
   void saveLogLevel(const QString &logLevel) const;
-  void setConfigFile(const QString &configFile);
-  void applyWatchdogCommand() const;
+  void applyWatchdogCommand(
+      deskflow::core::ipc::DaemonIpcServer *server, QLocalSocket *client, const QString &requestId, const QString &mode,
+      const QString &configFile, const std::shared_ptr<MSWindowsHandle> &token, quint32 sessionId
+  ) const;
   void clearWatchdogCommand();
   void clearSettings();
 
@@ -59,7 +64,5 @@ private:
 
   IEventQueue &m_events;
   FileLogOutputter *m_pFileLogOutputter = nullptr;
-  deskflow::core::ipc::DaemonIpcServer *m_ipcServer = nullptr;
-  QString m_configFile;
   bool m_foreground = false;
 };

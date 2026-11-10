@@ -19,7 +19,7 @@ class IpcServer : public QObject
   Q_OBJECT
 
 public:
-  explicit IpcServer(QObject *parent, const QString &serverName, const QString &typeName);
+  explicit IpcServer(QObject *parent, const QString &serverName, const QString &typeName, bool crossUser = false);
   ~IpcServer() override;
 
   void listen();
@@ -27,8 +27,6 @@ public:
 
 Q_SIGNALS:
   void logLevelChanged(const QString &logLevel);
-  void configFileChanged(const QString &configFile);
-  void startProcessRequested();
   void stopProcessRequested();
   void clearSettingsRequested();
 
@@ -43,14 +41,18 @@ protected:
 
 private:
   void processMessage(QLocalSocket *clientSocket, const QString &message);
+  virtual bool authorizeClient(QLocalSocket *) const
+  {
+    return true;
+  }
   virtual void processCommand(QLocalSocket *clientSocket, const QString &command, const QStringList &parts) = 0;
   void handleNewConnection();
-  void handleReadyRead();
+  void handleReadyRead(QLocalSocket *clientSocket);
   void handleDisconnected();
   void handleErrorOccurred();
 
   QLocalServer *m_server;
-  QSet<QLocalSocket *> m_clients;
+  QSet<QLocalSocket *> m_readyClients;
   QString m_serverName;
   QStringList m_pendingMessages;
   QByteArray m_typeName;

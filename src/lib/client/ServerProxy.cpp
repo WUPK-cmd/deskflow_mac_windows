@@ -14,6 +14,7 @@
 #include "deskflow/Clipboard.h"
 #include "deskflow/ClipboardChunk.h"
 #include "deskflow/DeskflowException.h"
+#include "deskflow/Microphone.h"
 #include "deskflow/OptionTypes.h"
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/ProtocolUtil.h"
@@ -199,6 +200,17 @@ ServerProxy::ConnectionResult ServerProxy::parseHandshakeMessage(const uint8_t *
 
 ServerProxy::ConnectionResult ServerProxy::handleMessage(const uint8_t *code)
 {
+  if (memcmp(code, deskflow::Microphone::kFrameMessage, 4) == 0) {
+    std::string pcm;
+    if (!ProtocolUtil::readf(m_stream, deskflow::Microphone::kFrameMessage + 4, &pcm) ||
+        pcm.size() != deskflow::Microphone::kFrameBytes || !m_client->receiveMicrophone(pcm)) {
+      requestDisconnect("invalid microphone frame");
+      return ConnectionResult::Disconnect;
+    }
+    ProtocolUtil::writef(m_stream, deskflow::Microphone::kAckMessage);
+    return ConnectionResult::Okay;
+  }
+
   const auto result = parseMessage(code);
   if (result == ConnectionResult::Okay) {
     // send a reply.  this is intended to work around a delay when
@@ -367,7 +379,7 @@ void ServerProxy::onClipboardChanged(ClipboardID id, const IClipboard *clipboard
   std::string data = IClipboard::marshall(clipboard);
   LOG_DEBUG("sending clipboard %d seqnum=%d", id, m_seqNum);
 
-  StreamChunker::sendClipboard(data, data.size(), id, m_seqNum, m_events, this);
+  StreamChunker::sendClipboard(data, id, m_seqNum, m_events, this);
 }
 
 void ServerProxy::flushCompressedMouse()
@@ -739,6 +751,7 @@ void ServerProxy::screensaver()
 
 void ServerProxy::resetOptions()
 {
+  m_client->offerMicrophone(false);
   // parse
   LOG_VERBOSE("recv reset options");
 
@@ -769,6 +782,7 @@ void ServerProxy::setOptions()
   // forward
   m_client->setOptions(options);
 
+  bool microphoneOffered = false;
   // update modifier table
   for (uint32_t i = 0, n = (uint32_t)options.size(); i < n; i += 2) {
     KeyModifierID id = kKeyModifierIDNull;
@@ -787,6 +801,8 @@ void ServerProxy::setOptions()
     } else if (options[i] == kOptionHeartbeat) {
       // update keep alive
       setKeepAliveRate(1.0e-3 * static_cast<double>(options[i + 1]));
+    } else if (options[i] == kOptionMicrophoneFollow) {
+      microphoneOffered = options[i + 1] == 1;
     }
 
     if (id != kKeyModifierIDNull) {
@@ -794,6 +810,9 @@ void ServerProxy::setOptions()
       LOG_VERBOSE("modifier %d mapped to %d", id, m_modifierTranslationTable[id]);
     }
   }
+
+  if (m_client->offerMicrophone(microphoneOffered))
+    ProtocolUtil::writef(m_stream, deskflow::Microphone::kReadyMessage);
 }
 
 void ServerProxy::queryInfo()

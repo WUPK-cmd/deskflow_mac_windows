@@ -124,6 +124,15 @@ public:
     inline static const auto XdpRestoreToken = QStringLiteral("server/xdpRestoreToken");
   };
 
+  struct Microphone
+  {
+    inline static const auto Enabled = QStringLiteral("microphone/enabled");
+    inline static const auto Input = QStringLiteral("microphone/input");
+    inline static const auto Output = QStringLiteral("microphone/output");
+    inline static const auto Target = QStringLiteral("microphone/target");
+    inline static const auto TargetFingerprint = QStringLiteral("microphone/targetFingerprint");
+  };
+
   struct Computer
   {
     inline static const auto Aliases = QStringLiteral("computer_%1/aliases");
@@ -268,6 +277,7 @@ private:
     , QStringLiteral("daemon")
     , QStringLiteral("gui")
     , QStringLiteral("log")
+    , QStringLiteral("microphone")
     , QStringLiteral("security")
     , QStringLiteral("server")
     , QStringLiteral("internalConfig")
@@ -303,6 +313,11 @@ private:
     , Log::File
     , Log::Level
     , Log::ToFile
+    , Microphone::Enabled
+    , Microphone::Input
+    , Microphone::Output
+    , Microphone::Target
+    , Microphone::TargetFingerprint
     , Log::GuiDebug
     , Gui::Autohide
     , Gui::AutoStartCore

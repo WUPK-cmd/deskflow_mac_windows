@@ -109,10 +109,32 @@ CoreProcess::CoreProcess(const ServerConfig &serverConfig)
   }
 
   connect(m_daemonIpcClient, &ipc::DaemonIpcClient::connected, this, &CoreProcess::daemonIpcClientConnected);
-  connect(
-      m_daemonIpcClient, &ipc::DaemonIpcClient::connectionFailed, this, &CoreProcess::daemonIpcClientConnectionFailed
-  );
+  const auto daemonConnectionFailed = [this] {
+    m_daemonIpcClient->disconnectFromServer();
+    ++m_serviceRequestId;
+    m_serviceStartSent = false;
+    if (m_lastProcessMode == ProcessMode::Service &&
+        (m_processState == ProcessState::Starting || m_processState == ProcessState::Stopping)) {
+      setProcessState(ProcessState::Stopped);
+      setConnectionState(ConnectionState::Disconnected);
+    }
+    Q_EMIT daemonIpcClientConnectionFailed();
+  };
+  connect(m_daemonIpcClient, &ipc::DaemonIpcClient::connectionFailed, this, daemonConnectionFailed);
+  connect(m_daemonIpcClient, &ipc::DaemonIpcClient::versionMismatch, this, daemonConnectionFailed);
   connect(m_daemonIpcClient, &ipc::DaemonIpcClient::logPathReceived, this, &CoreProcess::setupDaemonLogTail);
+  connect(m_daemonIpcClient, &ipc::DaemonIpcClient::startResultReceived, this, [this](quint64 requestId, bool started) {
+    if (requestId != m_serviceRequestId || !m_serviceStartSent || m_processState != ProcessState::Starting)
+      return;
+    m_serviceStartSent = false;
+    if (started) {
+      setProcessState(ProcessState::Started);
+    } else {
+      setProcessState(ProcessState::Stopped);
+      setConnectionState(ConnectionState::Disconnected);
+      Q_EMIT error(Error::StartFailed);
+    }
+  });
 
   connect(&m_retryTimer, &QTimer::timeout, this, [this] {
     if (m_processState == ProcessState::RetryPending) {
@@ -242,7 +264,7 @@ void CoreProcess::startForegroundProcess(const QStringList &args)
   }
 }
 
-void CoreProcess::startProcessFromDaemon()
+void CoreProcess::startProcessFromDaemon(const QString &mode)
 {
   if (m_processState != ProcessState::Starting) {
     qCritical("not starting core process from daemon, unexpected process state");
@@ -252,10 +274,12 @@ void CoreProcess::startProcessFromDaemon()
   const auto configFile = Settings::settingsFile();
   qInfo("sending start to daemon (config file: %s)", qPrintable(configFile));
 
-  auto sendStart = [this, configFile] {
-    m_daemonIpcClient->sendConfigFile(configFile);
-    m_daemonIpcClient->sendStartProcess();
-    setProcessState(ProcessState::Started);
+  const auto requestId = ++m_serviceRequestId;
+  auto sendStart = [this, requestId, mode, configFile] {
+    if (requestId != m_serviceRequestId || m_processState != ProcessState::Starting)
+      return;
+    m_serviceStartSent = true;
+    m_daemonIpcClient->sendStartProcess(requestId, mode, configFile);
   };
 
   if (m_daemonIpcClient->isConnected()) {
@@ -323,7 +347,9 @@ void CoreProcess::stopProcessFromDaemon()
     return;
   }
 
-  auto sendStop = [this] {
+  auto sendStop = [this, requestId = m_serviceRequestId] {
+    if (requestId != m_serviceRequestId || m_processState != ProcessState::Stopping)
+      return;
     m_daemonIpcClient->sendStopProcess();
     setProcessState(ProcessState::Stopped);
   };
@@ -376,7 +402,7 @@ void CoreProcess::handleLogLines(const QString &text)
 
 void CoreProcess::start(std::optional<ProcessMode> processModeOption)
 {
-  if (m_processState == ProcessState::Started) {
+  if (m_processState == ProcessState::Started || m_processState == ProcessState::Starting) {
     qCritical("not starting core process, already started");
     return;
   }
@@ -391,6 +417,7 @@ void CoreProcess::start(std::optional<ProcessMode> processModeOption)
   const auto currentMode = Settings::value(Settings::Core::ProcessMode).value<ProcessMode>();
   const auto processMode = processModeOption.value_or(currentMode);
   const auto coreMode = QVariant::fromValue(m_mode).toString().toLower();
+  m_lastProcessMode = processMode;
 
   qInfo().noquote() << QString("starting %1 process (%2 mode)").arg(coreMode, processModeToString(processMode));
 
@@ -492,10 +519,8 @@ void CoreProcess::start(std::optional<ProcessMode> processModeOption)
   if (processMode == ProcessMode::Desktop) {
     startForegroundProcess(args);
   } else if (processMode == ProcessMode::Service) {
-    startProcessFromDaemon();
+    startProcessFromDaemon(coreMode);
   }
-
-  m_lastProcessMode = processMode;
 }
 
 void CoreProcess::stop(std::optional<ProcessMode> processModeOption)
@@ -513,7 +538,12 @@ void CoreProcess::stop(std::optional<ProcessMode> processModeOption)
     m_coreIpcClient = nullptr;
   }
 
-  if (m_processState == ProcessState::Starting) {
+  const bool startSent = m_serviceStartSent;
+  if (processMode == ProcessMode::Service) {
+    ++m_serviceRequestId;
+    m_serviceStartSent = false;
+  }
+  if (m_processState == ProcessState::Starting && (processMode != ProcessMode::Service || !startSent)) {
     qDebug("core process is starting, cancelling");
     setProcessState(ProcessState::Stopped);
   } else if (m_processState != ProcessState::Stopped) {

@@ -67,6 +67,10 @@ if(WIN32)
   )
 
   set(QT_DEPENDS_DIR ${CMAKE_BINARY_DIR}/qt-depends)
+  if(BUILD_MICROPHONE_FOLLOW)
+    add_dependencies(${target} ${CMAKE_PROJECT_NAME}-core)
+    set(core_deploy_binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}-core>)
+  endif()
 
   add_custom_command(
     TARGET ${target} POST_BUILD
@@ -77,7 +81,7 @@ if(WIN32)
       --no-quick-import
       --dir "${QT_DEPENDS_DIR}"
       --plugindir "${QT_DEPENDS_DIR}/plugins"
-      $<TARGET_FILE:${target}>
+      $<TARGET_FILE:${target}> ${core_deploy_binary}
     COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
       ${QT_DEPENDS_DIR}
       $<TARGET_FILE_DIR:${target}>

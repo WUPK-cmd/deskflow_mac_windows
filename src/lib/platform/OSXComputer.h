@@ -167,8 +167,6 @@ private:
 
   // Quartz event tap support
   static CGEventRef handleCGInputEvent(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
-  static CGEventRef
-  handleCGInputEventSecondary(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon);
 
   // convert CFString to char*
   static char *CFStringRefToUTF8String(CFStringRef aString);

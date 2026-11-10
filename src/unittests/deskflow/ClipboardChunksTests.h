@@ -22,6 +22,13 @@ private Q_SLOTS:
   void assembleRefusesExpectedSizeBeyondLimit();
   void assembleDiscardsOversizeTransferThenAcceptsNext();
   void assembleAcceptsStartDuringOversizeTransfer();
+  void readVariableStringRejectsInvalidLength_data();
+  void readVariableStringRejectsInvalidLength();
+  void packetFilterRejectsInvalidHeader_data();
+  void packetFilterRejectsInvalidHeader();
+  void packetFilterRejectsTruncatedTail();
+  void packetFilterWritesCompleteSmallPacket_data();
+  void packetFilterWritesCompleteSmallPacket();
 
 private:
   Log m_log;

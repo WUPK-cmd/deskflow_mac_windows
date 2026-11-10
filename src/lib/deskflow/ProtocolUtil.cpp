@@ -15,6 +15,7 @@
 #include <iterator>
 
 #include <cstring>
+#include <utility>
 #include <vector>
 
 //
@@ -116,6 +117,7 @@ void ProtocolUtil::vwritef(deskflow::IStream *stream, const char *fmt, uint32_t 
 
   // fill buffer
   std::vector<uint8_t> Buffer;
+  Buffer.reserve(size);
   writef(Buffer, fmt, args);
 
   try {
@@ -190,11 +192,6 @@ void ProtocolUtil::vreadf(deskflow::IStream *stream, const char *fmt, va_list ar
 
       case 's': {
         std::string *destination = va_arg(args, std::string *);
-
-        if (len > PROTOCOL_MAX_STRING_LENGTH) {
-          LOG_ERR("read: string length exceeds maximum allowed size: %u", len);
-          throw BadClientException("Too long message received");
-        }
 
         readBytes(stream, len, destination);
         break;
@@ -520,48 +517,36 @@ void ProtocolUtil::readBytes(deskflow::IStream *stream, uint32_t len, std::strin
 
   // when string length is 0, this implies that the size of the string is
   // variable and will be embedded in the stream.
+  auto available = stream->getSize();
   if (len == 0) {
+    if (available < sizeof(uint32_t))
+      throw IOEndOfStreamException();
     len = read4BytesInt(stream);
+    available -= sizeof(uint32_t);
   }
 
-  // use a fixed size buffer if its big enough
-  const bool useFixed = (len <= sizeof(buffer));
+  if (len > PROTOCOL_MAX_STRING_LENGTH) {
+    LOG_ERR("read: string length exceeds maximum allowed size: %u", len);
+    throw BadClientException("Too long message received");
+  }
+  if (len > available) {
+    throw IOEndOfStreamException();
+  }
 
-  // allocate a buffer to read the data
-  uint8_t *sBuffer = buffer;
-  if (!useFixed) {
-    try {
-      sBuffer = new uint8_t[len];
-    } catch (std::bad_alloc &exception) {
-      // Added try catch due to GHSA-chfm-333q-gfpp
-      LOG_ERR("bad alloc, unable to allocate memory %d bytes", len);
-      LOG_DEBUG("bad_alloc detected: is there enough memory?");
-      throw exception;
+  if (len <= sizeof(buffer)) {
+    read(stream, buffer, len);
+    if (destination) {
+      destination->assign(reinterpret_cast<const char *>(buffer), len);
+    }
+  } else {
+    std::string data(len, '\0');
+    read(stream, data.data(), len);
+    if (destination) {
+      *destination = std::move(data);
     }
   }
 
-  // read the data
-  try {
-    read(stream, sBuffer, len);
-  } catch (...) {
-    if (!useFixed) {
-      delete[] sBuffer;
-    }
-    throw;
-  }
-
-  LOG_VERBOSE("readf: read %d byte string", len);
-
-  // save the data
-
-  if (destination) {
-    destination->assign((const char *)sBuffer, len);
-  }
-
-  // release the buffer
-  if (!useFixed) {
-    delete[] sBuffer;
-  }
+  LOG_VERBOSE("readf: read %u byte string", len);
 }
 
 //

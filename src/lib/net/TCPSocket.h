@@ -53,6 +53,7 @@ public:
   bool isReady() const override;
   bool isFatal() const override;
   uint32_t getSize() const override;
+  bool hasPendingOutput() const;
 
   // IDataSocket overrides
   void connect(const NetworkAddress &) override;

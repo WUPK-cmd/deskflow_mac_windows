@@ -19,6 +19,7 @@
 
 #include <climits>
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -28,7 +29,8 @@ class PrimaryClient;
 class InputFilter;
 namespace deskflow {
 class Computer;
-}
+class Microphone;
+} // namespace deskflow
 class IEventQueue;
 class Thread;
 class ClientListener;
@@ -358,6 +360,8 @@ private:
 
   // force the cursor off of \p client
   void forceLeaveClient(const BaseClientProxy *client);
+  void updateMicrophoneRoute();
+  void sendMicrophoneFrame();
 
 private:
   class ClipboardInfo
@@ -468,4 +472,9 @@ private:
   bool m_defaultLockToComputerState = false;
   bool m_disableLockToComputer = false;
   bool m_enableClipboard = true;
+  std::unique_ptr<deskflow::Microphone> m_microphone;
+  std::string m_microphoneTarget;
+  QString m_microphoneFingerprint;
+  EventQueueTimer *m_microphoneTimer = nullptr;
+  bool m_microphonePaused = false;
 };

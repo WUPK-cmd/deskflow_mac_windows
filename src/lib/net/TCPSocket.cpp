@@ -245,6 +245,12 @@ uint32_t TCPSocket::getSize() const
   return m_inputBuffer.getSize();
 }
 
+bool TCPSocket::hasPendingOutput() const
+{
+  Lock lock(&m_mutex);
+  return m_outputBuffer.getSize() != 0;
+}
+
 void TCPSocket::connect(const NetworkAddress &addr)
 {
   {

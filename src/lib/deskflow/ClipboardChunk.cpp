@@ -48,7 +48,7 @@ ClipboardChunk *ClipboardChunk::start(ClipboardID id, uint32_t sequence, const s
   return start;
 }
 
-ClipboardChunk *ClipboardChunk::data(ClipboardID id, uint32_t sequence, const std::string &data)
+ClipboardChunk *ClipboardChunk::data(ClipboardID id, uint32_t sequence, std::string_view data)
 {
   size_t dataSize = data.size();
   auto *chunk = new ClipboardChunk(dataSize + s_clipboardChunkMetaSize);
@@ -57,7 +57,8 @@ ClipboardChunk *ClipboardChunk::data(ClipboardID id, uint32_t sequence, const st
   chunkData[0] = id;
   std::memcpy(&chunkData[1], &sequence, 4);
   chunkData[5] = ChunkType::DataChunk;
-  memcpy(&chunkData[6], data.c_str(), dataSize);
+  if (!data.empty())
+    memcpy(&chunkData[6], data.data(), dataSize);
   chunkData[dataSize + s_clipboardChunkMetaSize - 1] = '\0';
 
   return chunk;

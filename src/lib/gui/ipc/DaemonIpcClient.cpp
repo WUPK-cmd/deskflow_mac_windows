@@ -19,14 +19,9 @@ void DaemonIpcClient::sendLogLevel(const QString &logLevel)
   sendMessage(QStringLiteral("logLevel=%1").arg(logLevel));
 }
 
-void DaemonIpcClient::sendConfigFile(const QString &configFile)
+void DaemonIpcClient::sendStartProcess(quint64 requestId, const QString &mode, const QString &configFile)
 {
-  sendMessage(QStringLiteral("configFile=%1").arg(configFile));
-}
-
-void DaemonIpcClient::sendStartProcess()
-{
-  sendMessage(QStringLiteral("start"));
+  sendMessage(QStringLiteral("start=%1=%2=%3").arg(QString::number(requestId), mode, configFile));
 }
 
 void DaemonIpcClient::sendStopProcess()
@@ -48,6 +43,12 @@ void DaemonIpcClient::processCommand(const QString &command, const QStringList &
 {
   if (command == QStringLiteral("logPath") && parts.size() == 2) {
     Q_EMIT logPathReceived(parts.at(1));
+  } else if (command == QStringLiteral("startResult") && parts.size() == 2) {
+    const auto result = parts.at(1).split('=');
+    bool validId = false;
+    const auto requestId = result.at(0).toULongLong(&validId);
+    if (validId && result.size() == 2)
+      Q_EMIT startResultReceived(requestId, result.at(1) == QStringLiteral("ok"));
   }
 }
 

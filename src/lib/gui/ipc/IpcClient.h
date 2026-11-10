@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QObject>
+#include <QTimer>
 
 class QLocalSocket;
 
@@ -21,8 +22,8 @@ class IpcClient : public QObject
   {
     Unconnected,
     Connecting,
+    Handshaking,
     Connected,
-    Disconnecting,
   };
 
 public:
@@ -59,12 +60,13 @@ private:
   void attemptConnection();
   void handleHandshakeMessage(const QStringList &parts);
   void handleConnectionSuccess();
-  void handleConnectionFailure();
+  void failConnection();
 
   QLocalSocket *m_socket;
   State m_state{State::Unconnected};
   QString m_socketName;
-  QByteArray m_readBuffer;
+  QTimer m_retryTimer;
+  QTimer m_handshakeTimer;
   int m_retryCount{0};
   QString m_typeName;
 };

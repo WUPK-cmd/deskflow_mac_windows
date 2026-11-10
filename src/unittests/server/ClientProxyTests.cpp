@@ -8,6 +8,7 @@
 
 #include "../deskflow/MockEventQueue.h"
 #include "deskflow/AppUtil.h"
+#include "deskflow/Microphone.h"
 #include "io/IStream.h"
 #include "server/ClientProxy1_0.h"
 #include "server/ClientProxy1_1.h"
@@ -98,6 +99,13 @@ private:
   QByteArray m_buffer;
 };
 
+class MicrophoneTestProxy : public ClientProxy1_8
+{
+public:
+  using ClientProxy1_8::ClientProxy1_8;
+  using ClientProxy1_8::parseMessage;
+};
+
 std::unique_ptr<ClientProxy> makeProxy(int minor, deskflow::IStream *stream, IEventQueue *events)
 {
   // the 1.4 and later constructors assert the server pointer is non-null but only store it
@@ -118,7 +126,7 @@ std::unique_ptr<ClientProxy> makeProxy(int minor, deskflow::IStream *stream, IEv
     proxy = std::make_unique<ClientProxy1_7>("client", stream, server, events);
     break;
   case 8:
-    proxy = std::make_unique<ClientProxy1_8>("client", stream, server, events);
+    proxy = std::make_unique<ClientProxy1_8>("client", stream, server, events, QString{});
     break;
   default:
     break;
@@ -151,6 +159,38 @@ void ClientProxyTests::initTestCase()
 {
   // the 1.8 constructor reads the keyboard layouts through AppUtil::instance()
   static TestAppUtil appUtil;
+}
+
+void ClientProxyTests::microphoneRequiresPinnedPeerAndOptIn()
+{
+  MockEventQueue events;
+  auto *server = reinterpret_cast<Server *>(0x1);
+  const QString fingerprint(64, QLatin1Char('a'));
+  const auto *ready = reinterpret_cast<const uint8_t *>(deskflow::Microphone::kReadyMessage);
+  MicrophoneTestProxy unverified("mac", new CapturingStream, server, &events, {});
+  MicrophoneTestProxy verified("mac", new CapturingStream, server, &events, fingerprint);
+
+  OptionsList options;
+  unverified.offerMicrophone(options, fingerprint);
+  QVERIFY(options.empty());
+  QVERIFY(unverified.parseMessage(ready));
+  QVERIFY(!unverified.acceptsMicrophone());
+
+  verified.offerMicrophone(options, QString(64, QLatin1Char('b')));
+  QVERIFY(options.empty());
+  QVERIFY(verified.parseMessage(ready));
+  QVERIFY(!verified.acceptsMicrophone());
+
+  verified.offerMicrophone(options, fingerprint);
+  QCOMPARE(options, (OptionsList{kOptionMicrophoneFollow, 1}));
+  QVERIFY(!verified.acceptsMicrophone());
+  QVERIFY(verified.parseMessage(ready));
+  QVERIFY(verified.acceptsMicrophone());
+
+  options.clear();
+  verified.offerMicrophone(options, {});
+  QVERIFY(options.empty());
+  QVERIFY(!verified.acceptsMicrophone());
 }
 
 // These formats are frozen because shipped third-party clients parse them byte

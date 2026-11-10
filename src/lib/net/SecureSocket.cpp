@@ -613,7 +613,13 @@ void SecureSocket::disconnect()
   sendEvent(StreamInputShutdown);
 }
 
-bool SecureSocket::verifyCertFingerprint(const QString &FingerprintDatabasePath) const
+QString SecureSocket::verifiedPeerFingerprint()
+{
+  Lock lock(&getMutex());
+  return m_verifiedPeerFingerprint;
+}
+
+bool SecureSocket::verifyCertFingerprint(const QString &FingerprintDatabasePath)
 {
   const auto cert = SSL_get_peer_certificate(m_ssl->m_ssl);
   const auto sha256 = deskflow::sslCertFingerprint(cert, QCryptographicHash::Sha256);
@@ -649,6 +655,7 @@ bool SecureSocket::verifyCertFingerprint(const QString &FingerprintDatabasePath)
     return false;
   }
 
+  m_verifiedPeerFingerprint = QString::fromLatin1(sha256.data.toHex());
   LOG_DEBUG("fingerprint matches trusted fingerprint");
   return true;
 }

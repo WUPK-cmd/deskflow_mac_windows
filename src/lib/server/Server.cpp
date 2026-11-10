@@ -10,10 +10,12 @@
 
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "common/Settings.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/Computer.h"
 #include "deskflow/DeskflowException.h"
 #include "deskflow/IPlatformComputer.h"
+#include "deskflow/Microphone.h"
 #include "deskflow/OptionTypes.h"
 #include "deskflow/PacketStreamFilter.h"
 #include "deskflow/ProtocolTypes.h"
@@ -22,6 +24,7 @@
 #include "net/TCPSocket.h"
 #include "server/ClientListener.h"
 #include "server/ClientProxy.h"
+#include "server/ClientProxy1_8.h"
 #include "server/ClientProxyUnknown.h"
 #include "server/PrimaryClient.h"
 
@@ -148,10 +151,36 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
     LOG_INFO("default computer lock is on, locking cursor to computer");
     m_lockedToComputer = true;
   }
+
+#ifdef Q_OS_WIN
+  const auto input = Settings::value(Settings::Microphone::Input).toString();
+  const auto output = Settings::value(Settings::Microphone::Output).toString();
+  m_microphoneTarget = Settings::value(Settings::Microphone::Target).toString().toStdString();
+  m_microphoneFingerprint = Settings::value(Settings::Microphone::TargetFingerprint)
+                                .toString()
+                                .simplified()
+                                .remove(':')
+                                .remove(' ')
+                                .toLower();
+  if (Settings::value(Settings::Microphone::Enabled).toBool() && !input.isEmpty() && !output.isEmpty() &&
+      !m_microphoneTarget.empty() && m_microphoneFingerprint.size() == 64) {
+    m_microphone = deskflow::Microphone::open(input, output);
+    if (m_microphone) {
+      m_microphoneTimer = m_events->newTimer(0.01, nullptr);
+      m_events->addHandler(EventTypes::Timer, m_microphoneTimer, [this](const auto &) { sendMicrophoneFrame(); });
+      updateMicrophoneRoute();
+    }
+  }
+#endif
 }
 
 Server::~Server()
 {
+  if (m_microphoneTimer) {
+    m_events->removeHandler(EventTypes::Timer, m_microphoneTimer);
+    m_events->deleteTimer(m_microphoneTimer);
+    m_microphone.reset();
+  }
   // remove event handlers and timers
   using enum EventTypes;
   m_events->removeHandler(KeyStateKeyDown, m_inputFilter);
@@ -491,6 +520,7 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
 
     // enter new computer
     m_active->enter(x, y, m_seqNum, m_primaryClient->getToggleMask(), forScreensaver);
+    updateMicrophoneRoute();
 
     if (m_enableClipboard) {
       // send the clipboard data to new active computer
@@ -1073,6 +1103,11 @@ void Server::sendOptions(BaseClientProxy *client) const
     }
   }
 
+  if (auto *proxy = dynamic_cast<ClientProxy1_8 *>(client))
+    proxy->offerMicrophone(
+        optionsList, m_microphone && getName(client) == m_microphoneTarget ? m_microphoneFingerprint : QString{}
+    );
+
   // send the options
   client->resetOptions();
   client->setOptions(optionsList);
@@ -1482,8 +1517,10 @@ void Server::onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, u
 void Server::onScreensaver(bool activated)
 {
   LOG_DEBUG("onScreenSaver %s", activated ? "activated" : "deactivated");
+  m_microphonePaused = activated;
 
   if (activated) {
+    updateMicrophoneRoute();
     // save current computer and position
     m_activeSaver = m_active;
     m_xSaver = m_x;
@@ -1523,6 +1560,7 @@ void Server::onScreensaver(bool activated)
 
     // reset state
     m_activeSaver = nullptr;
+    updateMicrophoneRoute();
   }
 
   // send message to all clients
@@ -2044,6 +2082,7 @@ void Server::forceLeaveClient(const BaseClientProxy *client)
 
     // cut over
     m_active = m_primaryClient;
+    updateMicrophoneRoute();
 
     // enter new computer (unless we already have because of the
     // screen saver)
@@ -2061,4 +2100,35 @@ void Server::forceLeaveClient(const BaseClientProxy *client)
 
   // tell primary client about the active sides
   m_primaryClient->reconfigure(getActivePrimarySides());
+}
+
+void Server::updateMicrophoneRoute()
+{
+  if (!m_microphone)
+    return;
+
+  using enum deskflow::Microphone::Route;
+  auto route = Muted;
+  if (!m_microphonePaused) {
+    if (m_active == m_primaryClient) {
+      route = Local;
+    } else if (auto *proxy = dynamic_cast<ClientProxy1_8 *>(m_active); proxy && proxy->acceptsMicrophone()) {
+      route = Remote;
+    }
+  }
+  m_microphone->setRoute(route);
+}
+
+void Server::sendMicrophoneFrame()
+{
+  // The peer can accept the offer after the pointer has already crossed.
+  if (m_active == m_primaryClient || m_microphonePaused)
+    return;
+
+  updateMicrophoneRoute();
+  if (auto *proxy = dynamic_cast<ClientProxy1_8 *>(m_active); proxy && proxy->acceptsMicrophone()) {
+    const auto frame = m_microphone->takeFrame();
+    if (!frame.isEmpty())
+      proxy->sendMicrophone(frame.toStdString());
+  }
 }

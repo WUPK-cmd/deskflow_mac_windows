@@ -17,13 +17,15 @@
 #include "net/NetworkAddress.h"
 
 #include <climits>
+#include <memory>
 #include <string>
 
 class Event;
 class EventQueueTimer;
 namespace deskflow {
 class Computer;
-}
+class Microphone;
+} // namespace deskflow
 class ServerProxy;
 class IDataSocket;
 class ISocketFactory;
@@ -162,6 +164,8 @@ public:
     return m_resolvedAddressesCount;
   }
   size_t getMaximumClipboardReceiveSizeBytes() const;
+  bool offerMicrophone(bool enabled);
+  bool receiveMicrophone(const std::string &pcm);
 
   //@}
 
@@ -218,6 +222,7 @@ private:
   void handleResume();
   void sendClipboardThread(void *);
   void bindNetworkInterface(IDataSocket *socket) const;
+  void updateMicrophoneRoute();
 
 private:
   std::string m_name;
@@ -244,4 +249,7 @@ private:
   int32_t m_relativeRestoreY = 0;
   size_t m_maximumClipboardSize = INT_MAX;
   size_t m_resolvedAddressesCount = 0;
+  std::unique_ptr<deskflow::Microphone> m_microphone;
+  bool m_microphoneOffered = false;
+  bool m_microphonePaused = false;
 };

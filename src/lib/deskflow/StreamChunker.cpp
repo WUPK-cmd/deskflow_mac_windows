@@ -11,43 +11,26 @@
 #include "base/Log.h"
 #include "deskflow/ClipboardChunk.h"
 
-static const size_t g_chunkSize = 512 * 1024; // 512kb
+#include <algorithm>
+
+static constexpr size_t kChunkSize = 512 * 1024;
 
 void StreamChunker::sendClipboard(
-    const std::string_view &data, size_t size, ClipboardID id, uint32_t sequence, IEventQueue *events, void *eventTarget
+    std::string_view data, ClipboardID id, uint32_t sequence, IEventQueue *events, void *eventTarget
 )
 {
-  // send first message (data size)
-  std::string dataSize = QString::number(size).toStdString();
-  ClipboardChunk *sizeMessage = ClipboardChunk::start(id, sequence, dataSize);
+  const auto size = data.size();
+  auto *start = ClipboardChunk::start(id, sequence, QString::number(size).toStdString());
+  events->addEvent(Event(EventTypes::ClipboardSending, eventTarget, start));
 
-  events->addEvent(Event(EventTypes::ClipboardSending, eventTarget, sizeMessage));
+  do {
+    const auto chunkSize = std::min(data.size(), kChunkSize);
+    auto *chunk = ClipboardChunk::data(id, sequence, data.substr(0, chunkSize));
+    events->addEvent(Event(EventTypes::ClipboardSending, eventTarget, chunk));
+    data.remove_prefix(chunkSize);
+  } while (!data.empty());
 
-  // send clipboard chunk with a fixed size
-  size_t sentLength = 0;
-  size_t chunkSize = g_chunkSize;
-
-  while (true) {
-    // make sure we don't read too much from the mock data.
-    if (sentLength + chunkSize > size) {
-      chunkSize = size - sentLength;
-    }
-
-    std::string chunk(data.substr(sentLength, chunkSize).data(), chunkSize);
-    ClipboardChunk *dataChunk = ClipboardChunk::data(id, sequence, chunk);
-
-    events->addEvent(Event(EventTypes::ClipboardSending, eventTarget, dataChunk));
-
-    sentLength += chunkSize;
-    if (sentLength == size) {
-      break;
-    }
-  }
-
-  // send last message
-  ClipboardChunk *end = ClipboardChunk::end(id, sequence);
-
+  auto *end = ClipboardChunk::end(id, sequence);
   events->addEvent(Event(EventTypes::ClipboardSending, eventTarget, end));
-
-  LOG_DEBUG("sent clipboard size=%d", sentLength);
+  LOG_DEBUG("queued clipboard size=%zu", size);
 }

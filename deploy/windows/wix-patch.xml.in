@@ -4,7 +4,7 @@
       Id="ServiceInstall"
       Name="Deskflow"
       DisplayName="Deskflow"
-      Description="Runs the Core process on secure desktops (UAC prompts, login screen, etc)."
+      Description="Runs the Core process in the signed-in user's desktop session."
       ErrorControl="normal"
       Start="auto"
       Type="ownProcess">

@@ -51,7 +51,7 @@ BOOL MSWindowsProcess::startInForeground()
   si.wShowWindow = SW_MINIMIZE;
 
   m_createProcessResult =
-      CreateProcess(nullptr, LPWSTR(m_command.c_str()), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &m_info);
+      CreateProcess(nullptr, m_command.data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &m_info);
   return m_createProcessResult;
 }
 
@@ -69,12 +69,13 @@ BOOL MSWindowsProcess::startAsUser(HANDLE userToken, LPSECURITY_ATTRIBUTES sa)
   ZeroMemory(&m_info, sizeof(PROCESS_INFORMATION));
   const DWORD creationFlags = NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT;
   m_createProcessResult = CreateProcessAsUser(
-      userToken, nullptr, LPWSTR(m_command.c_str()), sa, nullptr, TRUE, creationFlags, environment, nullptr, &si,
-      &m_info
+      userToken, nullptr, m_command.data(), sa, nullptr, TRUE, creationFlags, environment, nullptr, &si, &m_info
   );
 
+  const DWORD createError = GetLastError();
   DestroyEnvironmentBlock(environment);
-  CloseHandle(userToken);
+  if (!m_createProcessResult)
+    SetLastError(createError);
 
   return m_createProcessResult;
 }
@@ -221,11 +222,12 @@ bool MSWindowsProcess::startDetachedAsSessionUser(const std::wstring &command)
       userToken, nullptr, mutableCommand.data(), nullptr, nullptr, FALSE, flags, environment, nullptr, &si, &pi
   );
 
+  const DWORD createError = GetLastError();
   DestroyEnvironmentBlock(environment);
   CloseHandle(userToken);
 
   if (!ok) {
-    LOG_ERR("could not start process as session user, error: %s", windowsErrorToString(GetLastError()).c_str());
+    LOG_ERR("could not start process as session user, error: %s", windowsErrorToString(createError).c_str());
     return false;
   }
 

@@ -215,6 +215,18 @@ void ClipboardTests::unMarshalTextAndHtml()
   clipboard.close();
 }
 
+void ClipboardTests::unmarshalSkipsOutOfRangeFormat()
+{
+  const std::string data =
+      std::string("\0\0\0\2", 4) + std::string("\xff\xff\xff\xff\0\0\0\1x", 9) + std::string("\0\0\0\2\0\0\0\1y", 9);
+
+  Clipboard clipboard;
+  clipboard.unmarshall(data, 0);
+  QVERIFY(clipboard.open(0));
+  QCOMPARE(clipboard.get(IClipboard::Format::Bitmap), "y");
+  clipboard.close();
+}
+
 void ClipboardTests::equalClipboards()
 {
   Clipboard clipboard1;

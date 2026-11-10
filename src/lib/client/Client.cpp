@@ -20,6 +20,7 @@
 #include "deskflow/Computer.h"
 #include "deskflow/DeskflowException.h"
 #include "deskflow/IPlatformComputer.h"
+#include "deskflow/Microphone.h"
 #include "deskflow/PacketStreamFilter.h"
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/ProtocolUtil.h"
@@ -219,6 +220,7 @@ void Client::getCursorPos(int32_t &x, int32_t &y) const
 void Client::enter(int32_t xAbs, int32_t yAbs, uint32_t, KeyModifierMask mask, bool)
 {
   m_active = true;
+  updateMicrophoneRoute();
   if (m_relativeMouseMoves && m_hasRelativeRestorePosition) {
     xAbs = m_relativeRestoreX;
     yAbs = m_relativeRestoreY;
@@ -234,6 +236,7 @@ bool Client::leave()
     saveRelativeRestorePosition();
   }
   m_active = false;
+  updateMicrophoneRoute();
 
   m_computer->leave();
 
@@ -310,7 +313,39 @@ void Client::mouseWheel(int32_t xDelta, int32_t yDelta)
 
 void Client::screensaver(bool activate)
 {
+  m_microphonePaused = activate;
+  updateMicrophoneRoute();
   m_computer->screensaver(activate);
+}
+
+bool Client::offerMicrophone(bool enabled)
+{
+#ifdef Q_OS_MACOS
+  if (enabled && m_useSecureNetwork && !m_microphone && Settings::value(Settings::Microphone::Enabled).toBool()) {
+    const auto output = Settings::value(Settings::Microphone::Output).toString();
+    m_microphone = deskflow::Microphone::open({}, output);
+  }
+#endif
+  m_microphoneOffered = enabled && m_useSecureNetwork && m_microphone;
+  updateMicrophoneRoute();
+  return m_microphoneOffered;
+}
+
+bool Client::receiveMicrophone(const std::string &pcm)
+{
+  if (!m_microphoneOffered)
+    return false;
+  if (m_active && !m_microphonePaused)
+    m_microphone->receiveFrame(QByteArray::fromStdString(pcm));
+  return true;
+}
+
+void Client::updateMicrophoneRoute()
+{
+  if (m_microphone) {
+    using enum deskflow::Microphone::Route;
+    m_microphone->setRoute(m_microphoneOffered && m_active && !m_microphonePaused ? Local : Muted);
+  }
 }
 
 void Client::resetOptions()
@@ -459,6 +494,9 @@ void Client::setupConnection()
   m_events->addHandler(EventTypes::StreamInputShutdown, m_stream->getEventTarget(), [this](const auto &) {
     handleDisconnected();
   });
+  m_events->addHandler(EventTypes::StreamInputFormatError, m_stream->getEventTarget(), [this](const auto &) {
+    disconnect("invalid packet from server");
+  });
   m_events->addHandler(EventTypes::StreamOutputShutdown, m_stream->getEventTarget(), [this](const auto &) {
     handleDisconnected();
   });
@@ -525,11 +563,15 @@ void Client::cleanupConnecting()
 
 void Client::cleanupConnection()
 {
+  m_microphoneOffered = false;
+  m_microphonePaused = false;
+  updateMicrophoneRoute();
   if (m_stream != nullptr) {
     using enum EventTypes;
     m_events->removeHandler(StreamInputReady, m_stream->getEventTarget());
     m_events->removeHandler(StreamOutputError, m_stream->getEventTarget());
     m_events->removeHandler(StreamInputShutdown, m_stream->getEventTarget());
+    m_events->removeHandler(StreamInputFormatError, m_stream->getEventTarget());
     m_events->removeHandler(StreamOutputShutdown, m_stream->getEventTarget());
     m_events->removeHandler(SocketDisconnected, m_stream->getEventTarget());
     m_events->removeHandler(ClientDisconnectRequested, m_stream->getEventTarget());
@@ -571,6 +613,7 @@ void Client::handleConnected()
   LOG_VERBOSE("connected, waiting for hello");
   cleanupConnecting();
   setupConnection();
+  m_active = false;
 
   // reset clipboard state
   for (ClipboardID id = 0; id < kClipboardEnd; ++id) {
@@ -674,10 +717,10 @@ void Client::handleHello()
   // we cannot re-use `readf` to check for various hello messages,
   // as `readf` eats bytes (advances the stream position reference).
   std::string protocolName;
-  ProtocolUtil::readf(m_stream, kMsgHello, &protocolName, &serverMajor, &serverMinor);
+  const bool complete = ProtocolUtil::readf(m_stream, kMsgHello, &protocolName, &serverMajor, &serverMinor);
 
   if (const auto proto = networkProtocolFromString(QString::fromStdString(protocolName));
-      proto == NetworkProtocol::Unknown) {
+      !complete || proto == NetworkProtocol::Unknown) {
     LOG_WARN("hello back received with protocol: '%s'", protocolName.c_str());
     sendConnectionFailedEvent("got invalid hello message from server");
     cleanupTimer();

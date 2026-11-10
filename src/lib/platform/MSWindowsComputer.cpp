@@ -1370,15 +1370,12 @@ void MSWindowsComputer::warpCursorNoFlush(int32_t x, int32_t y)
   // between the previous message and the following message.
   setThisCursorPos(x, y);
 
-  // check to see if the mouse pos was set correctly
-  POINT cursorPos;
-  getThisCursorPos(&cursorPos);
-
   // there is a bug or round error in SetCursorPos and GetCursorPos on
   // a high DPI setting. The check here is for Vista/7 login screen.
-  // since this feature is mainly for client, so only check on client.
+  // only verify the result on the client, which uses the injection fallback.
   if (!isPrimary()) {
-    if ((cursorPos.x != x) && (cursorPos.y != y)) {
+    POINT cursorPos;
+    if (getThisCursorPos(&cursorPos) && cursorPos.x != x && cursorPos.y != y) {
       LOG_DEBUG("function 'SetCursorPos' failed; trying 'fakeMouseMove'");
       LOG_DEBUG("cursor pos %d, %d expected pos %d, %d", cursorPos.x, cursorPos.y, x, y);
       // when at Vista/7 login screen, SetCursorPos does not work (which could

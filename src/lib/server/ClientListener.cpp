@@ -16,6 +16,7 @@
 #include "net/IDataSocket.h"
 #include "net/IListenSocket.h"
 #include "net/ISocketFactory.h"
+#include "net/SecureSocket.h"
 #include "net/SocketException.h"
 #include "server/ClientProxy.h"
 #include "server/ClientProxyUnknown.h"
@@ -162,7 +163,12 @@ void ClientListener::handleClientAccepted(IDataSocket *socket)
   assert(m_server != nullptr);
 
   // create proxy for unknown client
-  auto *client = new ClientProxyUnknown(stream, 30.0, m_server, m_events);
+  QString fingerprint;
+  if (m_securityLevel == SecurityLevel::PeerAuth) {
+    if (auto *secureSocket = dynamic_cast<SecureSocket *>(socket))
+      fingerprint = secureSocket->verifiedPeerFingerprint();
+  }
+  auto *client = new ClientProxyUnknown(stream, 30.0, m_server, m_events, std::move(fingerprint));
 
   m_newClients.insert(client);
 

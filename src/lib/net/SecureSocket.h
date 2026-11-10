@@ -10,6 +10,8 @@
 #include "net/SecurityLevel.h"
 #include "net/TCPSocket.h"
 
+#include <QString>
+
 #include <memory>
 #include <mutex>
 
@@ -17,7 +19,6 @@ class Event;
 class IEventQueue;
 class SocketMultiplexer;
 class ISocketMultiplexerJob;
-class QString;
 
 struct Ssl;
 
@@ -59,6 +60,7 @@ public:
     m_fatal = b;
   }
   bool isSecureReady() const;
+  QString verifiedPeerFingerprint();
   void secureConnect();
   void secureAccept();
   int secureRead(void *buffer, int size, int &read);
@@ -78,7 +80,7 @@ private:
   bool showCertificate() const;
   void checkResult(int n, int &retry);
   void disconnect();
-  bool verifyCertFingerprint(const QString &FingerprintDatabasePath) const;
+  bool verifyCertFingerprint(const QString &FingerprintDatabasePath);
 
   ISocketMultiplexerJob *serviceConnect(ISocketMultiplexerJob *const socket, bool, bool, bool);
 
@@ -96,6 +98,7 @@ private:
   bool m_secureReady = false;
   bool m_fatal = false;
   SecurityLevel m_securityLevel = SecurityLevel::Encrypted;
+  QString m_verifiedPeerFingerprint;
 
   bool m_writeRetry = false;
   int m_writeRetrySize = 0;

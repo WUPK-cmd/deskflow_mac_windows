@@ -23,6 +23,8 @@ endif()
 
 #Project level options
 option(BUILD_INSTALLER "Build installer" ON)
+option(BUILD_TESTS "Build tests" ON)
+option(BUILD_MICROPHONE_FOLLOW "Build Windows-to-Mac microphone switching" OFF)
 option(ENABLE_COVERAGE "Enable test coverage" OFF)
 if(UNIX)
   if(APPLE)
@@ -172,6 +174,12 @@ add_definitions(-DQT_NO_KEYWORDS)
 
 #Find and setup Qt
 find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Core Widgets Network)
+if(BUILD_MICROPHONE_FOLLOW)
+    if(NOT WIN32 AND NOT APPLE)
+        message(FATAL_ERROR "Microphone switching requires Windows or macOS")
+    endif()
+    find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Multimedia)
+endif()
 if(UNIX AND NOT APPLE)
     find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS DBus)
 endif()
@@ -239,6 +247,10 @@ add_subdirectory(docs)
 
 # build translations before source, I18N unit tests fail if they are missing
 add_subdirectory(translations)
+
+if(BUILD_TESTS)
+  enable_testing()
+endif()
 
 add_subdirectory(src)
 

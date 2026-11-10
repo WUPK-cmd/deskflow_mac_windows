@@ -6,8 +6,11 @@
  */
 
 #include "ClipboardChunksTests.h"
+#include "MockEventQueue.h"
 
 #include "deskflow/ClipboardChunk.h"
+#include "deskflow/DeskflowException.h"
+#include "deskflow/PacketStreamFilter.h"
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/ProtocolUtil.h"
 #include "io/IStream.h"
@@ -17,6 +20,24 @@
 #include <deque>
 
 namespace {
+
+class PacketEventQueue : public MockEventQueue
+{
+public:
+  void addEvent(Event &&event) override
+  {
+    posted.append(event.getType());
+  }
+
+  QList<EventTypes> posted;
+};
+
+class TestPacketStreamFilter : public PacketStreamFilter
+{
+public:
+  using PacketStreamFilter::filterEvent;
+  using PacketStreamFilter::PacketStreamFilter;
+};
 
 class MemoryStream : public deskflow::IStream
 {
@@ -101,6 +122,11 @@ public:
     return m_buffer;
   }
 
+  int writes() const
+  {
+    return m_writes;
+  }
+
   void close() override
   {
     m_outputShutdown = true;
@@ -113,6 +139,7 @@ public:
 
   void write(const void *buffer, uint32_t n) override
   {
+    ++m_writes;
     if (!m_outputShutdown && n != 0) {
       m_buffer.append(static_cast<const char *>(buffer), n);
     }
@@ -148,6 +175,7 @@ public:
 
 private:
   std::string m_buffer;
+  int m_writes = 0;
   bool m_outputShutdown = false;
 };
 
@@ -166,6 +194,30 @@ void ClipboardChunksTests::initTestCase()
   m_log.setFilter(LogLevel::Level::Debug);
 }
 
+void ClipboardChunksTests::readVariableStringRejectsInvalidLength_data()
+{
+  QTest::addColumn<QByteArray>("packet");
+  QTest::addColumn<bool>("overLimit");
+  QTest::newRow("over protocol limit") << QByteArray::fromHex("ffffffff") << true;
+  QTest::newRow("length truncated") << QByteArray::fromHex("000000") << false;
+  QTest::newRow("payload truncated") << QByteArray::fromHex("0000000278") << false;
+}
+
+void ClipboardChunksTests::readVariableStringRejectsInvalidLength()
+{
+  QFETCH(QByteArray, packet);
+  QFETCH(bool, overLimit);
+  MemoryStream stream;
+  stream.push(packet.toStdString());
+  std::string value;
+  if (overLimit) {
+    QVERIFY_THROWS_EXCEPTION(BadClientException, ProtocolUtil::readf(&stream, "%s", &value));
+  } else {
+    QVERIFY(!ProtocolUtil::readf(&stream, "%s", &value));
+  }
+  QVERIFY(value.empty());
+}
+
 void ClipboardChunksTests::startFormatData()
 {
   ClipboardID id = 0;
@@ -182,6 +234,73 @@ void ClipboardChunksTests::startFormatData()
   QCOMPARE(chunk->m_chunk[7], '0');
   QCOMPARE(chunk->m_chunk[8], '\0');
   delete chunk;
+}
+
+void ClipboardChunksTests::packetFilterRejectsInvalidHeader_data()
+{
+  QTest::addColumn<QByteArray>("header");
+  QTest::newRow("zero length") << QByteArray::fromHex("00000000");
+  QTest::newRow("over limit") << QByteArray::fromHex("ffffffff");
+}
+
+void ClipboardChunksTests::packetFilterRejectsInvalidHeader()
+{
+  QFETCH(QByteArray, header);
+  PacketEventQueue events;
+  MemoryStream stream;
+  TestPacketStreamFilter filter(&events, &stream, false);
+  stream.push(header.toStdString());
+  filter.filterEvent(Event(EventTypes::StreamInputReady, &stream));
+  stream.push(QByteArray::fromHex("0000000178").toStdString());
+  filter.filterEvent(Event(EventTypes::StreamInputReady, &stream));
+
+  QVERIFY(!filter.isReady());
+  QCOMPARE(events.posted, QList<EventTypes>{EventTypes::StreamInputFormatError});
+}
+
+void ClipboardChunksTests::packetFilterRejectsTruncatedTail()
+{
+  PacketEventQueue events;
+  MemoryStream stream;
+  TestPacketStreamFilter filter(&events, &stream, false);
+  stream.push(QByteArray::fromHex("00000001780000000279").toStdString());
+  filter.filterEvent(Event(EventTypes::StreamInputReady, &stream));
+  filter.filterEvent(Event(EventTypes::StreamInputShutdown, &stream));
+
+  QVERIFY(events.posted.isEmpty());
+  char value = '\0';
+  QCOMPARE(filter.read(&value, 1), 1u);
+  QCOMPARE(value, 'x');
+  QVERIFY(!filter.isReady());
+  QCOMPARE(events.posted, QList<EventTypes>{EventTypes::StreamInputFormatError});
+}
+
+void ClipboardChunksTests::packetFilterWritesCompleteSmallPacket_data()
+{
+  QTest::addColumn<QByteArray>("payload");
+  QTest::addColumn<QByteArray>("expected");
+  QTest::addColumn<int>("writes");
+
+  QTest::newRow("empty write") << QByteArray{} << QByteArray{} << 0;
+  QTest::newRow("mouse move") << QByteArray::fromHex("444d4d5600000123")
+                              << QByteArray::fromHex("00000008444d4d5600000123") << 1;
+  const QByteArray largePayload(512, 'x');
+  QTest::newRow("large payload") << largePayload << QByteArray::fromHex("00000200") + largePayload << 2;
+}
+
+void ClipboardChunksTests::packetFilterWritesCompleteSmallPacket()
+{
+  QFETCH(QByteArray, payload);
+  QFETCH(QByteArray, expected);
+  QFETCH(int, writes);
+  PacketEventQueue events;
+  BufferWriteStream stream;
+  PacketStreamFilter filter(&events, &stream, false);
+
+  filter.write(payload.constData(), static_cast<uint32_t>(payload.size()));
+
+  QCOMPARE(QByteArray::fromStdString(stream.str()), expected);
+  QCOMPARE(stream.writes(), writes);
 }
 
 void ClipboardChunksTests::formatDataChunk()

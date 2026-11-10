@@ -40,11 +40,13 @@ private:
   bool isReadyNoLock() const;
   bool readPacketSize();
   bool readMore();
+  void rejectInput();
 
 private:
   mutable std::mutex m_mutex;
   uint32_t m_size = 0;
   StreamBuffer m_buffer;
   bool m_inputShutdown = false;
+  bool m_inputFailed = false;
   IEventQueue *m_events = nullptr;
 };

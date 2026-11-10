@@ -790,18 +790,6 @@
          <property name="checked">
           <bool>false</bool>
          </property>
-         <layout class="QGridLayout" name="_6">
-          <item row="1" column="0">
-           <widget class="QCheckBox" name="cbElevateDaemon">
-            <property name="text">
-             <string>Always run as system (work at login screen and UAC)</string>
-            </property>
-            <property name="autoExclusive">
-             <bool>false</bool>
-            </property>
-           </widget>
-          </item>
-         </layout>
         </widget>
        </item>
        <item>
