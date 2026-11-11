@@ -232,15 +232,11 @@ OSXKeyState::OSXKeyState(
 void OSXKeyState::init()
 {
   m_deadKeyState = 0;
-  m_shiftPressed = false;
-  m_controlPressed = false;
-  m_altPressed = false;
-  m_superPressed = false;
+  m_shift = {};
+  m_control = {};
+  m_alt = {};
+  m_super = {};
   m_capsPressed = false;
-  m_shiftRightPressed = false;
-  m_controlRightPressed = false;
-  m_altRightPressed = false;
-  m_superRightPressed = false;
 
   // build virtual key map
   for (size_t i = 0; i < sizeof(s_controlKeys) / sizeof(s_controlKeys[0]); ++i) {
@@ -416,19 +412,19 @@ CGEventFlags OSXKeyState::getModifierStateAsOSXFlags() const
 {
   CGEventFlags modifiers = 0;
 
-  if (m_shiftPressed) {
+  if (m_shift.any()) {
     modifiers |= kCGEventFlagMaskShift;
   }
 
-  if (m_controlPressed) {
+  if (m_control.any()) {
     modifiers |= kCGEventFlagMaskControl;
   }
 
-  if (m_altPressed) {
+  if (m_alt.any()) {
     modifiers |= kCGEventFlagMaskAlternate;
   }
 
-  if (m_superPressed) {
+  if (m_super.any()) {
     modifiers |= kCGEventFlagMaskCommand;
   }
 
@@ -560,20 +556,29 @@ CGEventFlags OSXKeyState::getDeviceDependedFlags() const
 {
   CGEventFlags modifiers = 0;
 
-  if (m_shiftPressed) {
-    modifiers |= m_shiftRightPressed ? NX_DEVICERSHIFTKEYMASK : NX_DEVICELSHIFTKEYMASK;
+  if (m_shift.held(false)) {
+    modifiers |= NX_DEVICELSHIFTKEYMASK;
   }
-
-  if (m_controlPressed) {
-    modifiers |= m_controlRightPressed ? NX_DEVICERCTLKEYMASK : NX_DEVICELCTLKEYMASK;
+  if (m_shift.held(true)) {
+    modifiers |= NX_DEVICERSHIFTKEYMASK;
   }
-
-  if (m_altPressed) {
-    modifiers |= m_altRightPressed ? NX_DEVICERALTKEYMASK : NX_DEVICELALTKEYMASK;
+  if (m_control.held(false)) {
+    modifiers |= NX_DEVICELCTLKEYMASK;
   }
-
-  if (m_superPressed) {
-    modifiers |= m_superRightPressed ? NX_DEVICERCMDKEYMASK : NX_DEVICELCMDKEYMASK;
+  if (m_control.held(true)) {
+    modifiers |= NX_DEVICERCTLKEYMASK;
+  }
+  if (m_alt.held(false)) {
+    modifiers |= NX_DEVICELALTKEYMASK;
+  }
+  if (m_alt.held(true)) {
+    modifiers |= NX_DEVICERALTKEYMASK;
+  }
+  if (m_super.held(false)) {
+    modifiers |= NX_DEVICELCMDKEYMASK;
+  }
+  if (m_super.held(true)) {
+    modifiers |= NX_DEVICERCMDKEYMASK;
   }
 
   return modifiers;
@@ -596,40 +601,28 @@ void OSXKeyState::setKeyboardModifiers(CGKeyCode virtualKey, bool keyDown)
 {
   switch (virtualKey) {
   case s_shiftVK:
-    m_shiftPressed = keyDown;
-    if (keyDown)
-      m_shiftRightPressed = false;
+    m_shift.set(false, keyDown);
     break;
   case s_shiftRightVK:
-    m_shiftPressed = keyDown;
-    m_shiftRightPressed = keyDown;
+    m_shift.set(true, keyDown);
     break;
   case s_controlVK:
-    m_controlPressed = keyDown;
-    if (keyDown)
-      m_controlRightPressed = false;
+    m_control.set(false, keyDown);
     break;
   case s_controlRightVK:
-    m_controlPressed = keyDown;
-    m_controlRightPressed = keyDown;
+    m_control.set(true, keyDown);
     break;
   case s_altVK:
-    m_altPressed = keyDown;
-    if (keyDown)
-      m_altRightPressed = false;
+    m_alt.set(false, keyDown);
     break;
   case s_altRightVK:
-    m_altPressed = keyDown;
-    m_altRightPressed = keyDown;
+    m_alt.set(true, keyDown);
     break;
   case s_superVK:
-    m_superPressed = keyDown;
-    if (keyDown)
-      m_superRightPressed = false;
+    m_super.set(false, keyDown);
     break;
   case s_superRightVK:
-    m_superPressed = keyDown;
-    m_superRightPressed = keyDown;
+    m_super.set(true, keyDown);
     break;
   case s_capsLockVK:
     m_capsPressed = keyDown;

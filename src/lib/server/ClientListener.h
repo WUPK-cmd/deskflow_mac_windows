@@ -12,6 +12,7 @@
 #include "server/Config.h"
 
 #include <deque>
+#include <map>
 #include <memory>
 #include <set>
 
@@ -23,6 +24,7 @@ class ISocketFactory;
 class Server;
 class IEventQueue;
 class IDataSocket;
+class EventQueueTimer;
 
 class ClientListener
 {
@@ -72,6 +74,7 @@ private:
   void handleClientDisconnected(ClientProxy *client);
 
   void removeClientSocket(IDataSocket *socket);
+  void removeAcceptHandlers(IDataSocket *socket);
   void cleanupListenSocket();
   void cleanupClientSockets();
   void start();
@@ -81,9 +84,14 @@ private:
 private:
   using NewClients = std::set<ClientProxyUnknown *>;
   using WaitingClients = std::deque<ClientProxy *>;
-  using ClientSockets = std::set<IDataSocket *>;
+  struct PendingSocket
+  {
+    std::unique_ptr<IDataSocket> socket;
+    EventQueueTimer *timer;
+  };
+  using ClientSockets = std::map<IDataSocket *, PendingSocket>;
 
-  IListenSocket *m_listen;
+  IListenSocket *m_listen = nullptr;
   std::unique_ptr<ISocketFactory> m_socketFactory;
   NewClients m_newClients;
   WaitingClients m_waitingClients;

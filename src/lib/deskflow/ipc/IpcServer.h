@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QMap>
 #include <QObject>
 #include <QSet>
 
@@ -55,6 +56,7 @@ private:
   QSet<QLocalSocket *> m_readyClients;
   QString m_serverName;
   QStringList m_pendingMessages;
+  QMap<QString, QString> m_stateMessages;
   QByteArray m_typeName;
 };
 

@@ -24,6 +24,10 @@ class IpcClient : public QObject
     Connecting,
     Handshaking,
     Connected,
+    VersionMismatch,
+    RecoveryHandshaking,
+    RecoveryConnected,
+    ServerClosing,
   };
 
 public:
@@ -34,6 +38,10 @@ public:
   bool isConnected() const
   {
     return m_state == State::Connected;
+  }
+  bool isClosing() const
+  {
+    return m_state == State::ServerClosing;
   }
 
 Q_SIGNALS:
@@ -55,6 +63,7 @@ protected:
   }
 
   void sendMessage(const QString &message);
+  void sendStopMessage();
 
 private:
   void attemptConnection();
@@ -69,6 +78,7 @@ private:
   QTimer m_handshakeTimer;
   int m_retryCount{0};
   QString m_typeName;
+  QString m_serverVersion;
 };
 
 } // namespace deskflow::gui::ipc

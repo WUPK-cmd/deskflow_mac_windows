@@ -11,6 +11,15 @@
 
 void SettingsTests::initTestCase()
 {
+  QVERIFY(m_tempSettings.isValid());
+  m_settingsPath = m_settingsPathTemp;
+#ifdef Q_OS_WIN
+  if (!Settings::isPortableMode())
+    m_settingsPath = Settings::SystemDir;
+#endif
+  m_expectedTlsDir = QStringLiteral("%1/tls").arg(m_settingsPath);
+  m_expectedTlsServerDB = QStringLiteral("%1/trusted-servers").arg(m_expectedTlsDir);
+  m_expectedTlsClientDB = QStringLiteral("%1/trusted-clients").arg(m_expectedTlsDir);
   QFile oldSettings(m_settingsFile);
   if (oldSettings.exists())
     oldSettings.remove();
@@ -103,12 +112,22 @@ void SettingsTests::checkCleanComputerName_LongName()
 
 void SettingsTests::checkClearState()
 {
+  const auto computerName = Settings::value(Settings::Core::ComputerName);
+  Settings::setValue(Settings::Server::EnableClipboard, false);
+  QSettings separateState(m_stateFile, QSettings::IniFormat);
+  separateState.setValue("separate-profile", "keep");
+  separateState.sync();
   Settings::setValue(Settings::Gui::WindowGeometry, QRect(1, 2, 3, 4));
   QVERIFY(Settings::value(Settings::Gui::WindowGeometry).toRect().isValid());
 
   Settings::clearState();
 
   QVERIFY(!Settings::value(Settings::Gui::WindowGeometry).toRect().isValid());
+  QCOMPARE(Settings::value(Settings::Core::ComputerName), computerName);
+  QCOMPARE(Settings::value(Settings::Server::EnableClipboard).toBool(), false);
+  separateState.sync();
+  if (Settings::isPortableMode())
+    QCOMPARE(separateState.value("separate-profile").toString(), QString("keep"));
 }
 
 QTEST_MAIN(SettingsTests)

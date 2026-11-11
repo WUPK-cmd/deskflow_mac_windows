@@ -13,6 +13,8 @@
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/KeyTypes.h"
 
+#include <bitset>
+
 class Client;
 class ClientInfo;
 class EventQueueTimer;
@@ -124,6 +126,7 @@ private:
   int32_t m_dyMouse = 0;
 
   bool m_ignoreMouse = false;
+  std::bitset<256> m_mouseButtons;
 
   KeyModifierID m_modifierTranslationTable[kKeyModifierIDLast];
 

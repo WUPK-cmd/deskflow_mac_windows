@@ -25,6 +25,11 @@ void PrimaryClient::reconfigure(uint32_t activeSides)
   m_computer->reconfigure(activeSides);
 }
 
+void PrimaryClient::cancelClipboardRetries(ClipboardID id)
+{
+  m_computer->cancelClipboardRetries(id);
+}
+
 uint32_t PrimaryClient::registerHotKey(KeyID key, KeyModifierMask mask)
 {
   return m_computer->registerHotKey(key, mask);
@@ -117,11 +122,9 @@ void PrimaryClient::setClipboard(ClipboardID id, const IClipboard *clipboard)
 {
   // ignore if this clipboard is already clean
   if (m_clipboardDirty[id]) {
-    // this clipboard is now clean
-    m_clipboardDirty[id] = false;
-
     // set clipboard
-    m_computer->setClipboard(id, clipboard);
+    if (m_computer->setClipboard(id, clipboard))
+      m_clipboardDirty[id] = false;
   }
 }
 

@@ -6,6 +6,14 @@ if(WIN32)
 endif()
 
 create_test(
+  NAME ClipboardRetryTests
+  DEPENDS app
+  LIBS arch base io server ${extra_libs}
+  SOURCE ClipboardRetryTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/deskflow"
+)
+
+create_test(
   NAME OutputSchedulingTests
   DEPENDS app
   LIBS arch base io ${extra_libs}

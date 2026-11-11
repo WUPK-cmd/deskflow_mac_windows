@@ -97,26 +97,30 @@ void *TCPListenSocket::getEventTarget() const
 
 std::unique_ptr<IDataSocket> TCPListenSocket::accept()
 {
-  std::unique_ptr<IDataSocket> socket;
   try {
-    socket = std::make_unique<TCPSocket>(m_events, m_socketMultiplexer, ARCH->acceptSocket(m_socket, nullptr));
+    auto *accepted = ARCH->acceptSocket(m_socket, nullptr);
+    std::unique_ptr<IDataSocket> socket;
+    if (accepted) {
+      // TCPSocket adopts this handle and closes it on initialization failure.
+      socket = std::make_unique<TCPSocket>(m_events, m_socketMultiplexer, accepted);
+    }
     setListeningJob();
     return socket;
   } catch (ArchNetworkException &) {
-    if (socket) {
-      setListeningJob();
-    }
+    // serviceListening stopped polling before it posted the accept event. An
+    // interrupted/reset accept must resume polling even when no client exists.
+    setListeningJob();
     return nullptr;
-  } catch (std::exception &ex) {
-    if (socket) {
-      setListeningJob();
-    }
-    throw ex;
+  } catch (...) {
+    setListeningJob();
+    throw;
   }
 }
 
 void TCPListenSocket::setListeningJob()
 {
+  if (!m_socket)
+    return;
   m_socketMultiplexer->addSocket(
       this,
       new TSocketMultiplexerMethodJob<TCPListenSocket>(this, &TCPListenSocket::serviceListening, m_socket, true, false)

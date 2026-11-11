@@ -7,6 +7,7 @@
 
 #include "deskflow/PacketStreamFilter.h"
 #include "base/IEventQueue.h"
+#include "deskflow/KeyTypes.h"
 #include "deskflow/ProtocolTypes.h"
 
 #include <cstring>
@@ -20,6 +21,12 @@ PacketStreamFilter::PacketStreamFilter(IEventQueue *events, deskflow::IStream *s
       m_events(events)
 {
   // do nothing
+}
+
+PacketStreamFilter::~PacketStreamFilter()
+{
+  std::scoped_lock lock{m_mutex};
+  cancelOutput();
 }
 
 void PacketStreamFilter::close()
@@ -88,26 +95,31 @@ void PacketStreamFilter::write(const void *buffer, uint32_t count)
       m_mouseButtons.reset(data[4]);
   }
 
-  // Keep the uncontended input path allocation-free.
-  if (m_output.empty() && !getStream()->hasPendingOutput()) {
+  const bool clipboard = count >= 4 && memcmp(data, kMsgDClipboard, 4) == 0;
+  // Keep the uncontended input path allocation-free, including input arriving
+  // during a clipboard cooldown when there are no earlier queued dependencies.
+  if (m_output.empty() && !getStream()->hasPendingOutput() && !(clipboard && m_bulkTimer)) {
     writePacket(buffer, count);
     return;
   }
 
   OutputPacket packet{
       std::vector<uint8_t>(data, data + count),
-      count == 8 && memcmp(data, kMsgDMouseMove, 4) == 0 && m_mouseButtons.none(),
-      count >= 4 && memcmp(data, kMsgDClipboard, 4) == 0
+      count == 8 && memcmp(data, kMsgDMouseMove, 4) == 0 && m_mouseButtons.none(), clipboard
   };
-  if (packet.position) {
-    // Only cross queued clipboard packets. Every reliable control packet is a
-    // barrier, including relative motion and every move within a held-button drag.
+  if (count == 4 && memcmp(data, kMsgCKeepAlive, 4) == 0) {
+    // Heartbeats carry no input/clipboard dependency and must survive even a
+    // paste barrier queued behind a slow bulk transfer.
+    m_output.push_front(std::move(packet));
+  } else if (isPriorityInput(data, count)) {
+    // Cross only trailing unsent clipboard packets. Earlier input and modified
+    // keyboard chords remain barriers, preserving their relative order.
     auto start = m_output.size();
-    while (start > 0 && (m_output[start - 1].position || m_output[start - 1].clipboard))
+    while (start > 0 && m_output[start - 1].clipboard)
       --start;
 
-    if (start < m_output.size() && m_output[start].position)
-      m_output[start] = std::move(packet);
+    if (packet.position && start > 0 && m_output[start - 1].position)
+      m_output[start - 1] = std::move(packet);
     else
       m_output.insert(m_output.begin() + static_cast<std::ptrdiff_t>(start), std::move(packet));
   } else {
@@ -116,7 +128,36 @@ void PacketStreamFilter::write(const void *buffer, uint32_t count)
   drainOutput();
 }
 
-void PacketStreamFilter::writePacket(const void *buffer, uint32_t count)
+bool PacketStreamFilter::isPriorityInput(const uint8_t *data, uint32_t count)
+{
+  if (count < 4)
+    return false;
+  if (memcmp(data, kMsgDMouseMove, 4) == 0 || memcmp(data, kMsgDMouseRelMove, 4) == 0 ||
+      memcmp(data, kMsgDMouseDown, 4) == 0 || memcmp(data, kMsgDMouseUp, 4) == 0 ||
+      memcmp(data, kMsgDMouseWheel, 4) == 0)
+    return true;
+
+  // All supported key formats retain key and modifier fields at these offsets,
+  // including legacy key messages and language-bearing DKDL/DKRP messages.
+  const bool keyMessage = memcmp(data, kMsgDKeyDown1_0, 4) == 0 || memcmp(data, kMsgDKeyDown, 4) == 0 ||
+                          memcmp(data, kMsgDKeyRepeat, 4) == 0 || memcmp(data, kMsgDKeyUp, 4) == 0;
+  if (!keyMessage || count < 8)
+    return false;
+  const auto key = (uint32_t(data[4]) << 8) | uint32_t(data[5]);
+  const auto mask = (uint32_t(data[6]) << 8) | uint32_t(data[7]);
+  constexpr auto dependencyModifiers =
+      KeyModifierControl | KeyModifierAlt | KeyModifierMeta | KeyModifierSuper | KeyModifierAltGr;
+  if (mask & dependencyModifiers)
+    return false;
+  if ((key >= kKeyControl_L && key <= kKeyControl_R) || (key >= kKeyMeta_L && key <= kKeySuper_R) || key == kKeyAltGr)
+    return false;
+  if ((mask & KeyModifierShift) &&
+      (key == kKeyInsert || key == kKeyDelete || key == kKeyKP_Insert || key == kKeyKP_Delete))
+    return false;
+  return true;
+}
+
+void PacketStreamFilter::writePacket(const void *buffer, uint32_t count, bool paceBulk)
 {
   constexpr uint32_t headerSize = 4;
   constexpr uint32_t smallPayloadSize = 64;
@@ -130,11 +171,14 @@ void PacketStreamFilter::writePacket(const void *buffer, uint32_t count)
   if (count <= smallPayloadSize) {
     memcpy(packet + headerSize, buffer, count);
     getStream()->write(packet, headerSize + count);
-    return;
+  } else {
+    getStream()->write(packet, headerSize);
+    getStream()->write(buffer, count);
   }
 
-  getStream()->write(packet, headerSize);
-  getStream()->write(buffer, count);
+  const auto *data = static_cast<const uint8_t *>(buffer);
+  if (paceBulk && count >= 10 && memcmp(data, kMsgDClipboard, 4) == 0 && data[9] == ChunkType::DataChunk)
+    startBulkTimer();
 }
 
 void PacketStreamFilter::drainOutput()
@@ -142,15 +186,47 @@ void PacketStreamFilter::drainOutput()
   // A buffered socket resumes here on output completion. Unbuffered streams can
   // consume the queue immediately without relying on a completion notification.
   while (!m_outputShutdown && !m_output.empty() && !getStream()->hasPendingOutput()) {
+    if (m_output.front().clipboard && m_bulkTimer)
+      break;
     auto packet = std::move(m_output.front());
     m_output.pop_front();
     writePacket(packet.data.data(), static_cast<uint32_t>(packet.data.size()));
   }
 }
 
+void PacketStreamFilter::startBulkTimer()
+{
+  if (m_bulkTimer)
+    return;
+  // One existing 16 KiB chunk per five-millisecond turn bounds bulk feeding.
+  // Socket/TLS completion alone cannot pour the whole transfer into the kernel.
+  // Input already ahead of the next chunk remains runnable during this pause.
+  m_bulkTimer = m_events->newOneShotTimer(0.005, nullptr);
+  if (!m_bulkTimer)
+    return;
+  m_events->addHandler(EventTypes::Timer, m_bulkTimer, [this](const auto &) {
+    std::scoped_lock lock{m_mutex};
+    cancelBulkTimer();
+    const bool wasQueued = !m_output.empty();
+    drainOutput();
+    if (wasQueued && m_output.empty() && !getStream()->hasPendingOutput())
+      m_events->addEvent(Event(EventTypes::StreamOutputFlushed, getEventTarget()));
+  });
+}
+
+void PacketStreamFilter::cancelBulkTimer()
+{
+  if (!m_bulkTimer)
+    return;
+  m_events->removeHandler(EventTypes::Timer, m_bulkTimer);
+  m_events->deleteTimer(m_bulkTimer);
+  m_bulkTimer = nullptr;
+}
+
 void PacketStreamFilter::cancelOutput()
 {
   m_outputShutdown = true;
+  cancelBulkTimer();
   m_output.clear();
   m_mouseButtons.reset();
 }
@@ -159,10 +235,11 @@ void PacketStreamFilter::flush()
 {
   {
     std::scoped_lock lock{m_mutex};
+    cancelBulkTimer();
     while (!m_output.empty()) {
       auto packet = std::move(m_output.front());
       m_output.pop_front();
-      writePacket(packet.data.data(), static_cast<uint32_t>(packet.data.size()));
+      writePacket(packet.data.data(), static_cast<uint32_t>(packet.data.size()), false);
     }
   }
   StreamFilter::flush();

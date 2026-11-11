@@ -12,6 +12,16 @@ class OutputSchedulingTests : public QObject
   Q_OBJECT
 
 private Q_SLOTS:
+  void ordinaryInputOvertakesTrailingClipboard_data();
+  void ordinaryInputOvertakesTrailingClipboard();
+  void modifiedKeysRemainClipboardBarriers_data();
+  void modifiedKeysRemainClipboardBarriers();
+  void heartbeatBypassesQueuedPasteBarrier();
+  void bulkFeedWaitsForTimerWhileInputRemainsImmediate();
+  void destructionCancelsBulkTimer();
+  void terminationCancelsBulkTimer_data();
+  void terminationCancelsBulkTimer();
+  void inputKeepsRelativeOrderWhileOvertakingBulk();
   void reportsCompletionOnlyWhenAllScheduledOutputIsDrained();
   void reportsWriteErrorAfterOutputShutdown();
   void coalescesLargeBurstToOneFinalPosition();

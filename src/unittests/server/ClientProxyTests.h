@@ -17,6 +17,7 @@ class ClientProxyTests : public QObject
 private Q_SLOTS:
   void initTestCase();
   void microphoneRequiresPinnedPeerAndOptIn();
+  void closeQueuesMessageWithoutWaitingForPeer();
   void keyDown_data();
   void keyDown();
   void keyRepeat_data();

@@ -9,6 +9,7 @@
 #include "base/DirectionTypes.h"
 #include "base/Log.h"
 #include "deskflow/DisplayException.h"
+#include "platform/InputState.h"
 
 #include <cstring>
 #include <mutex>
@@ -36,7 +37,7 @@ static WPARAM g_deadVirtKey = 0;
 static WPARAM g_deadRelease = 0;
 static LPARAM g_deadLParam = 0;
 static BYTE g_deadKeyState[MSWindowsHook::kVirtualKeyCount] = {0};
-static BYTE g_keyState[MSWindowsHook::kVirtualKeyCount] = {0};
+static deskflow::platform::WindowsPhysicalKeyState g_keyState;
 static WCHAR g_lastChars[MSWindowsHook::kVirtualKeyCount] = {0};
 static BYTE g_lastNoAltGr[MSWindowsHook::kVirtualKeyCount] = {0};
 static bool g_keyStateValid = false;
@@ -153,7 +154,7 @@ bool MSWindowsHook::getPhysicalKeyState(BYTE keys[MSWindowsHook::kVirtualKeyCoun
 {
   std::lock_guard<std::mutex> lock(g_keyStateMutex);
   if (g_keyStateValid) {
-    std::memcpy(keys, g_keyState, sizeof(g_keyState));
+    std::memcpy(keys, g_keyState.keys().data(), g_keyState.keys().size());
   }
   return g_keyStateValid;
 }
@@ -170,32 +171,12 @@ static void keyboardGetState(BYTE keys[MSWindowsHook::kVirtualKeyCount], DWORD v
 
   std::lock_guard<std::mutex> lock(g_keyStateMutex);
 
-  // Keep track of key state on our own in case GetAsyncKeyState() fails
-  g_keyState[vkCode] = kf_up ? 0 : 0x80;
-  g_keyState[VK_SHIFT] = g_keyState[VK_LSHIFT] | g_keyState[VK_RSHIFT];
+  g_keyState.update(vkCode, !kf_up, g_mode == kHOOK_RELAY_EVENTS, [](size_t key) {
+    return GetAsyncKeyState(static_cast<int>(key));
+  });
+  std::memcpy(keys, g_keyState.keys().data(), g_keyState.keys().size());
 
-  SHORT key;
-  // Test whether GetAsyncKeyState() is being honest with us
-  key = GetAsyncKeyState(vkCode);
-
-  if (key & 0x80) {
-    // The only time we know for sure that GetAsyncKeyState() is working
-    // is when it tells us that the current key is down.
-    // In this case, update g_keyState to reflect what GetAsyncKeyState()
-    // is telling us, just in case we have gotten out of sync
-
-    for (int i = 0; i < MSWindowsHook::kVirtualKeyCount; ++i) {
-      key = GetAsyncKeyState(i);
-      g_keyState[i] = (BYTE)((key < 0) ? 0x80u : 0);
-    }
-  }
-
-  // copy g_keyState to keys
-  for (int i = 0; i < MSWindowsHook::kVirtualKeyCount; ++i) {
-    keys[i] = g_keyState[i];
-  }
-
-  key = GetKeyState(VK_CAPITAL);
+  SHORT key = GetKeyState(VK_CAPITAL);
   keys[VK_CAPITAL] = (BYTE)(((key < 0) ? 0x80 : 0) | (key & 1));
   g_keyStateValid = true;
 }
@@ -725,7 +706,7 @@ int MSWindowsHook::uninstall()
   }
 
   std::lock_guard<std::mutex> lock(g_keyStateMutex);
-  std::memset(g_keyState, 0, sizeof(g_keyState));
+  g_keyState.reset();
   g_keyStateValid = false;
 
   return 1;

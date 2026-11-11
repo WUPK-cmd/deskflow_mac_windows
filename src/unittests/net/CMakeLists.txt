@@ -29,4 +29,12 @@ create_test(
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/net"
 )
 
+create_test(
+  NAME ListenSocketTests
+  DEPENDS net
+  LIBS base arch mt io app ${extra_libs}
+  SOURCE ListenSocketTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/net"
+)
+
 

@@ -1,6 +1,14 @@
 # SPDX-FileCopyrightText: (C) 2025 - 2026 Deskflow Developers
 # SPDX-License-Identifier: MIT
 
+create_test(
+  NAME InputStateTests
+  DEPENDS platform
+  LIBS base arch
+  SOURCE InputStateTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
+)
+
 if (WIN32)
   create_test(
     NAME MSWindowsClipboardTests

@@ -5,6 +5,7 @@
 
 #include "MockEventQueue.h"
 #include "deskflow/ClipboardChunk.h"
+#include "deskflow/KeyTypes.h"
 #include "deskflow/PacketStreamFilter.h"
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/ProtocolUtil.h"
@@ -18,6 +19,7 @@
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace {
@@ -25,6 +27,39 @@ namespace {
 class RecordingEventQueue : public MockEventQueue
 {
 public:
+  struct Timer
+  {
+    double duration;
+    void *target;
+  };
+  std::map<EventQueueTimer *, std::unique_ptr<Timer>> timers;
+
+  EventQueueTimer *newOneShotTimer(double duration, void *target) override
+  {
+    auto timer = std::make_unique<Timer>(Timer{duration, target});
+    auto *key = reinterpret_cast<EventQueueTimer *>(timer.get());
+    if (!target)
+      timer->target = key;
+    timers.emplace(key, std::move(timer));
+    return key;
+  }
+
+  void deleteTimer(EventQueueTimer *timer) override
+  {
+    timers.erase(timer);
+  }
+
+  void expireTimers()
+  {
+    std::vector<EventQueueTimer *> pending;
+    for (const auto &[key, timer] : timers)
+      pending.push_back(key);
+    for (auto *key : pending) {
+      if (const auto timer = timers.find(key); timer != timers.end())
+        dispatchEvent(Event(EventTypes::Timer, timer->second->target));
+    }
+  }
+
   ~RecordingEventQueue() override
   {
     for (const auto &event : posted)
@@ -145,15 +180,17 @@ public:
     m_pending = true;
   }
 
-  void completeOutput(RecordingEventQueue &events)
+  void completeOutput(RecordingEventQueue &events, bool advanceTimers = true)
   {
     m_pending = false;
     events.dispatchEvent(Event(EventTypes::StreamOutputFlushed, getEventTarget()));
+    if (advanceTimers)
+      events.expireTimers();
   }
 
   void drainOutput(RecordingEventQueue &events)
   {
-    for (int i = 0; i < 100 && m_pending; ++i)
+    for (int i = 0; i < 100 && (m_pending || !events.timers.empty()); ++i)
       completeOutput(events);
   }
 
@@ -265,18 +302,186 @@ void OutputSchedulingTests::respectsControlBarriers_data()
 {
   QTest::addColumn<QByteArray>("barrier");
   QTest::addColumn<bool>("dragging");
-  QTest::newRow("button down") << message(kMsgDMouseDown, 1) << true;
-  QTest::newRow("button up") << message(kMsgDMouseUp, 1) << false;
-  QTest::newRow("legacy key down") << message(kMsgDKeyDown1_0, 0x61, 0) << false;
-  QTest::newRow("key down") << message(kMsgDKeyDown1_1, 0x61, 0, 0x1e) << false;
-  QTest::newRow("key up") << message(kMsgDKeyUp, 0x61, 0, 0x1e) << false;
-  QTest::newRow("key repeat") << message(kMsgDKeyRepeat1_1, 0x61, 0, 2, 0x1e) << false;
-  QTest::newRow("wheel") << message(kMsgDMouseWheel, 0, 120) << false;
-  QTest::newRow("legacy wheel") << message(kMsgDMouseWheel1_0, 120) << false;
   QTest::newRow("enter") << message(kMsgCEnter, 1, 2, 3, 0) << false;
   QTest::newRow("leave") << message(kMsgCLeave) << false;
-  QTest::newRow("relative move") << message(kMsgDMouseRelMove, 4, 5) << false;
   QTest::newRow("clipboard ownership") << message(kMsgCClipboard, 0, 7) << false;
+}
+
+void OutputSchedulingTests::ordinaryInputOvertakesTrailingClipboard_data()
+{
+  const std::string language = "en";
+  QTest::addColumn<QByteArray>("input");
+  QTest::newRow("legacy key down") << message(kMsgDKeyDown1_0, 0x61, 0);
+  QTest::newRow("key down") << message(kMsgDKeyDown1_1, 0x61, 0, 0x1e);
+  QTest::newRow("language key down") << message(kMsgDKeyDown, 0x61, 0, 0x1e, &language);
+  QTest::newRow("key up") << message(kMsgDKeyUp, 0x61, 0, 0x1e);
+  QTest::newRow("key repeat") << message(kMsgDKeyRepeat1_1, 0x61, 0, 2, 0x1e);
+  QTest::newRow("shift typing") << message(kMsgDKeyDown1_1, 0x41, KeyModifierShift, 0x1e);
+  QTest::newRow("caps typing") << message(kMsgDKeyDown1_1, 0x41, KeyModifierCapsLock, 0x1e);
+  QTest::newRow("button down") << message(kMsgDMouseDown, 1);
+  QTest::newRow("button up") << message(kMsgDMouseUp, 1);
+  QTest::newRow("wheel") << message(kMsgDMouseWheel, 0, 120);
+  QTest::newRow("legacy wheel") << message(kMsgDMouseWheel1_0, 120);
+  QTest::newRow("relative move") << message(kMsgDMouseRelMove, 4, 5);
+}
+
+void OutputSchedulingTests::ordinaryInputOvertakesTrailingClipboard()
+{
+  QFETCH(QByteArray, input);
+  RecordingEventQueue events;
+  BufferedStream stream;
+  PacketStreamFilter filter(&events, &stream, false);
+  stream.makeBusy();
+  const auto data = clipboard(ChunkType::DataChunk, "ABC");
+  write(filter, data);
+  write(filter, input);
+  stream.drainOutput(events);
+  QCOMPARE(stream.packets(), (QList<QByteArray>{input, data}));
+}
+
+void OutputSchedulingTests::modifiedKeysRemainClipboardBarriers_data()
+{
+  QTest::addColumn<QByteArray>("key");
+  QTest::newRow("control chord") << message(kMsgDKeyDown1_1, 0x76, KeyModifierControl, 0x2f);
+  QTest::newRow("alt chord") << message(kMsgDKeyUp, 0x61, KeyModifierAlt, 0x1e);
+  QTest::newRow("meta repeat") << message(kMsgDKeyRepeat1_1, 0x63, KeyModifierMeta, 2, 0x2e);
+  QTest::newRow("super chord") << message(kMsgDKeyDown1_0, 0x76, KeyModifierSuper);
+  QTest::newRow("shift insert") << message(kMsgDKeyDown1_1, kKeyInsert, KeyModifierShift, 0x52);
+  QTest::newRow("shift delete") << message(kMsgDKeyDown1_1, kKeyDelete, KeyModifierShift, 0x53);
+  QTest::newRow("shift keypad insert") << message(kMsgDKeyDown1_1, kKeyKP_Insert, KeyModifierShift, 0x52);
+  QTest::newRow("control key itself") << message(kMsgDKeyUp, kKeyControl_L, 0, 0x1d);
+  QTest::newRow("meta key itself") << message(kMsgDKeyDown1_1, kKeyMeta_R, 0, 0x5c);
+}
+
+void OutputSchedulingTests::modifiedKeysRemainClipboardBarriers()
+{
+  QFETCH(QByteArray, key);
+  RecordingEventQueue events;
+  BufferedStream stream;
+  PacketStreamFilter filter(&events, &stream, false);
+  stream.makeBusy();
+  const auto data = clipboard(ChunkType::DataChunk, "ABC");
+  const auto typing = message(kMsgDKeyDown1_1, 0x61, 0, 0x1e);
+  const auto wheel = message(kMsgDMouseWheel, 0, 120);
+  write(filter, data);
+  write(filter, key);
+  write(filter, typing);
+  write(filter, wheel);
+  stream.drainOutput(events);
+  QCOMPARE(stream.packets(), (QList<QByteArray>{data, key, typing, wheel}));
+}
+
+void OutputSchedulingTests::heartbeatBypassesQueuedPasteBarrier()
+{
+  RecordingEventQueue events;
+  BufferedStream stream;
+  PacketStreamFilter filter(&events, &stream, false);
+  stream.makeBusy();
+  const auto data = clipboard(ChunkType::DataChunk, "ABC");
+  const auto paste = message(kMsgDKeyDown1_1, 0x76, KeyModifierControl, 0x2f);
+  const auto heartbeat = message(kMsgCKeepAlive);
+  write(filter, data);
+  write(filter, paste);
+  write(filter, heartbeat);
+  stream.drainOutput(events);
+  QCOMPARE(stream.packets(), (QList<QByteArray>{heartbeat, data, paste}));
+}
+
+void OutputSchedulingTests::bulkFeedWaitsForTimerWhileInputRemainsImmediate()
+{
+  RecordingEventQueue events;
+  BufferedStream stream(false);
+  PacketStreamFilter filter(&events, &stream, false);
+  const auto first = clipboard(ChunkType::DataChunk, "ABC");
+  const auto second = clipboard(ChunkType::DataChunk, "DEF");
+  const auto typing = message(kMsgDKeyDown1_1, 0x61, 0, 0x1e);
+  write(filter, first);
+  write(filter, second);
+  QCOMPARE(stream.packets(), (QList<QByteArray>{first}));
+  QCOMPARE(events.timers.size(), size_t(1));
+  write(filter, typing);
+  QCOMPARE(stream.packets(), (QList<QByteArray>{first, typing}));
+  events.dispatchEvent(Event(EventTypes::StreamOutputFlushed, stream.getEventTarget()));
+  QCOMPARE(stream.packets(), (QList<QByteArray>{first, typing}));
+  events.expireTimers();
+  QCOMPARE(stream.packets(), (QList<QByteArray>{first, typing, second}));
+}
+
+void OutputSchedulingTests::destructionCancelsBulkTimer()
+{
+  RecordingEventQueue events;
+  BufferedStream stream(false);
+  auto filter = std::make_unique<PacketStreamFilter>(&events, &stream, false);
+  write(*filter, clipboard(ChunkType::DataChunk, "ABC"));
+  QCOMPARE(events.timers.size(), size_t(1));
+  auto *timer = events.timers.begin()->first;
+  write(*filter, clipboard(ChunkType::DataChunk, "DEF"));
+  filter.reset();
+  QVERIFY(events.timers.empty());
+  const auto attempts = stream.writeAttempts;
+  QVERIFY(!events.dispatchEvent(Event(EventTypes::Timer, timer)));
+  QCOMPARE(stream.writeAttempts, attempts);
+}
+
+void OutputSchedulingTests::terminationCancelsBulkTimer_data()
+{
+  QTest::addColumn<int>("termination");
+  QTest::newRow("close") << 0;
+  QTest::newRow("shutdown output") << 1;
+  QTest::newRow("output failure") << 2;
+  QTest::newRow("socket disconnect") << 3;
+}
+
+void OutputSchedulingTests::terminationCancelsBulkTimer()
+{
+  QFETCH(int, termination);
+  RecordingEventQueue events;
+  BufferedStream stream(false);
+  PacketStreamFilter filter(&events, &stream, false);
+  write(filter, clipboard(ChunkType::DataChunk, "ABC"));
+  QCOMPARE(events.timers.size(), size_t(1));
+  auto *timer = events.timers.begin()->first;
+  write(filter, clipboard(ChunkType::DataChunk, "DEF"));
+  if (termination == 0)
+    filter.close();
+  else if (termination == 1)
+    filter.shutdownOutput();
+  else
+    events.dispatchEvent(Event(
+        termination == 2 ? EventTypes::StreamOutputError : EventTypes::SocketDisconnected, stream.getEventTarget()
+    ));
+  QVERIFY(events.timers.empty());
+  const auto attempts = stream.writeAttempts;
+  QVERIFY(!events.dispatchEvent(Event(EventTypes::Timer, timer)));
+  stream.completeOutput(events);
+  QCOMPARE(stream.writeAttempts, attempts);
+}
+
+void OutputSchedulingTests::inputKeepsRelativeOrderWhileOvertakingBulk()
+{
+  RecordingEventQueue events;
+  BufferedStream stream;
+  PacketStreamFilter filter(&events, &stream, false);
+  stream.makeBusy();
+  const auto data = clipboard(ChunkType::DataChunk, "ABC");
+  const QList<QByteArray> inputs{
+      position(1, 2),
+      message(kMsgDKeyDown1_1, 0x61, 0, 0x1e),
+      message(kMsgDKeyUp, 0x61, 0, 0x1e),
+      message(kMsgDMouseDown, 1),
+      position(3, 4),
+      position(5, 6),
+      message(kMsgDMouseUp, 1),
+      message(kMsgDMouseWheel, 0, 120),
+      message(kMsgDMouseRelMove, 7, 8)
+  };
+  write(filter, data);
+  for (const auto &packet : inputs)
+    write(filter, packet);
+  stream.drainOutput(events);
+  auto expected = inputs;
+  expected.append(data);
+  QCOMPARE(stream.packets(), expected);
 }
 
 void OutputSchedulingTests::respectsControlBarriers()

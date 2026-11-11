@@ -13,11 +13,15 @@
 #include "deskflow/MouseTypes.h"
 #include "deskflow/OptionTypes.h"
 
+#include <array>
+#include <memory>
 #include <string>
 
 class IClipboard;
 class IPlatformComputer;
 class IEventQueue;
+class EventQueueTimer;
+class Clipboard;
 
 namespace deskflow {
 
@@ -89,7 +93,10 @@ public:
   Sets the system's clipboard contents.  This is usually called
   soon after an enter().
   */
-  void setClipboard(ClipboardID, const IClipboard *);
+  bool setClipboard(ClipboardID, const IClipboard *);
+
+  // A local ownership change supersedes any deferred remote clipboard write.
+  void cancelClipboardRetries(ClipboardID);
 
   //! Grab clipboard
   /*!
@@ -291,6 +298,19 @@ protected:
   void leaveSecondary();
 
 private:
+  struct ClipboardRetry
+  {
+    std::unique_ptr<Clipboard> data;
+    bool read = false;
+    bool write = false;
+    unsigned int attempts = 0;
+    uint64_t generation = 0;
+  };
+  void armClipboardRetry();
+  void retryClipboards();
+  void clearClipboardRetries();
+  bool hasClipboardRetries() const;
+
   // our platform dependent computer
   IPlatformComputer *m_computer = nullptr;
 
@@ -311,6 +331,9 @@ private:
   bool m_fakeInput = false;
 
   IEventQueue *m_events = nullptr;
+  std::array<ClipboardRetry, kClipboardEnd> m_clipboardRetries;
+  EventQueueTimer *m_clipboardRetryTimer = nullptr;
+  uint32_t m_clipboardSequenceNumber = 0;
 };
 
 } // namespace deskflow

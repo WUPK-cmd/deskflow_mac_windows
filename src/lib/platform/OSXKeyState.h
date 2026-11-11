@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "platform/InputState.h"
+
 #include "OSXAutoTypes.h"
 #include "deskflow/KeyState.h"
 
@@ -157,15 +159,9 @@ private:
   mutable uint32_t m_deadKeyState;
   AutoCFArray m_groups{nullptr, CFRelease};
   GroupMap m_groupMap;
-  bool m_shiftPressed;
-  bool m_controlPressed;
-  bool m_altPressed;
-  bool m_superPressed;
+  deskflow::platform::ModifierKeyState m_shift;
+  deskflow::platform::ModifierKeyState m_control;
+  deskflow::platform::ModifierKeyState m_alt;
+  deskflow::platform::ModifierKeyState m_super;
   bool m_capsPressed;
-  // track whether the right-hand variant of a modifier is held so the
-  // device-dependent event flags report the correct side.
-  bool m_shiftRightPressed;
-  bool m_controlRightPressed;
-  bool m_altRightPressed;
-  bool m_superRightPressed;
 };

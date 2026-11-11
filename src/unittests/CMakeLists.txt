@@ -17,6 +17,19 @@ function(create_test)
 
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
+  # Settings may be initialized before a fixture redirects it to QTemporaryDir.
+  # Keep that initial access inside the build tree rather than the user's profile.
+  set(test_settings_dirs "${CMAKE_CURRENT_BINARY_DIR}/settings")
+  foreach(config IN LISTS CMAKE_CONFIGURATION_TYPES)
+    list(APPEND test_settings_dirs "${CMAKE_CURRENT_BINARY_DIR}/${config}/settings")
+  endforeach()
+  foreach(settings_dir IN LISTS test_settings_dirs)
+    file(MAKE_DIRECTORY "${settings_dir}")
+    if(NOT EXISTS "${settings_dir}/Deskflow.conf")
+      file(WRITE "${settings_dir}/Deskflow.conf" "")
+    endif()
+  endforeach()
+
   if("${m_NAME}" STREQUAL "")
     message(FATAL_ERROR "create_test, tests require a NAME")
   endif()
@@ -40,6 +53,9 @@ function(create_test)
   endif()
   add_test(NAME ${m_NAME} COMMAND $<TARGET_FILE:${m_NAME}> WORKING_DIRECTORY ${m_WORKING_DIRECTORY})
   set_tests_properties(${m_NAME} PROPERTIES DEPENDS ${m_DEPENDS})
+  set_tests_properties(${m_NAME} PROPERTIES ENVIRONMENT
+    "XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-profile/config;XDG_STATE_HOME=${CMAKE_CURRENT_BINARY_DIR}/test-profile/state"
+  )
   set_property(GLOBAL APPEND PROPERTY ${CMAKE_PROJECT_NAME}_tests ${m_NAME})
 
   if(ENABLE_COVERAGE)

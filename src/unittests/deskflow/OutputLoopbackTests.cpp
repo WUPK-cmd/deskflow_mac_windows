@@ -3,20 +3,33 @@
 #include "OutputLoopbackTests.h"
 
 #include "MockEventQueue.h"
+#include "common/Settings.h"
+#include "deskflow/KeyTypes.h"
 #include "deskflow/PacketStreamFilter.h"
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/ProtocolUtil.h"
+#include "net/FingerprintDatabase.h"
 #include "net/NetworkAddress.h"
+#include "net/SecureSocket.h"
+#include "net/SecureUtils.h"
 #include "net/SocketMultiplexer.h"
 #include "net/TCPSocket.h"
 
+#include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
 #include <QNetworkProxy>
+#include <QSslCertificate>
+#include <QSslKey>
+#include <QSslSocket>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QtEndian>
 
+#include <chrono>
 #include <deque>
 #include <functional>
 #include <map>
@@ -31,6 +44,26 @@ namespace {
 class LoopbackEventQueue : public MockEventQueue
 {
 public:
+  struct Timer
+  {
+    std::chrono::steady_clock::time_point deadline;
+    void *target;
+    bool posted = false;
+  };
+  EventQueueTimer *newOneShotTimer(double duration, void *target) override
+  {
+    auto timer = std::make_unique<Timer>();
+    timer->deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(qRound64(duration * 1000));
+    auto *key = reinterpret_cast<EventQueueTimer *>(timer.get());
+    timer->target = target ? target : key;
+    m_timers.emplace(key, std::move(timer));
+    return key;
+  }
+  void deleteTimer(EventQueueTimer *timer) override
+  {
+    m_timers.erase(timer);
+  }
+
   ~LoopbackEventQueue() override
   {
     for (const auto &event : m_pending)
@@ -77,6 +110,13 @@ public:
 
   void drain()
   {
+    const auto now = std::chrono::steady_clock::now();
+    for (const auto &[key, timer] : m_timers) {
+      if (!timer->posted && now >= timer->deadline) {
+        timer->posted = true;
+        addEvent(Event(EventTypes::Timer, timer->target));
+      }
+    }
     // A bounded turn lets the Qt peer make progress even under a stream of flush events.
     for (int i = 0; i < 256; ++i) {
       Event event;
@@ -106,6 +146,31 @@ private:
   std::mutex m_mutex;
   std::deque<Event> m_pending;
   std::map<std::pair<EventTypes, void *>, EventHandler, HandlerLess> m_handlers;
+  std::map<EventQueueTimer *, std::unique_ptr<Timer>> m_timers;
+};
+
+class ProbeServer : public QTcpServer
+{
+public:
+  bool tls = false;
+  QSslCertificate certificate;
+  QSslKey key;
+  QSslSocket *tlsPeer = nullptr;
+
+protected:
+  void incomingConnection(qintptr descriptor) override
+  {
+    if (!tls) {
+      QTcpServer::incomingConnection(descriptor);
+      return;
+    }
+    tlsPeer = new QSslSocket(this);
+    tlsPeer->setLocalCertificate(certificate);
+    tlsPeer->setPrivateKey(key);
+    tlsPeer->setPeerVerifyMode(QSslSocket::VerifyNone);
+    tlsPeer->setSocketDescriptor(descriptor);
+    tlsPeer->startServerEncryption();
+  }
 };
 
 bool waitFor(LoopbackEventQueue &events, const std::function<bool()> &condition)
@@ -176,7 +241,7 @@ void OutputLoopbackTests::realTcpStreamPreservesClipboardAndInputOrdering()
   ProtocolUtil::writef(&stream, kMsgDClipboard, 0, 7, ChunkType::DataEnd, &empty);
   for (int i = 0; i < 100; ++i)
     ProtocolUtil::writef(&stream, kMsgDMouseMove, 100 + i, 200 + i);
-  ProtocolUtil::writef(&stream, kMsgDKeyDown1_1, 0x76, 0, 0x2f);
+  ProtocolUtil::writef(&stream, kMsgDKeyDown1_1, 0x76, KeyModifierControl, 0x2f);
   ProtocolUtil::writef(&stream, kMsgDMouseDown, 1);
   ProtocolUtil::writef(&stream, kMsgDMouseMove, 300, 220);
   ProtocolUtil::writef(&stream, kMsgDMouseMove, 310, 230);
@@ -248,7 +313,7 @@ void OutputLoopbackTests::realTcpStreamPreservesClipboardAndInputOrdering()
       }
     } else if (tag == "DKDN") {
       paste = int(i);
-      QCOMPARE(packet, QByteArray::fromHex("444b444e00760000002f"));
+      QCOMPARE(packet, QByteArray::fromHex("444b444e00760002002f"));
       QVERIFY(clipboardEnd >= 0 && clipboardEnd < paste);
       QVERIFY(lastPointerBeforePaste >= 0);
       QCOMPARE(packets[size_t(lastPointerBeforePaste)], QByteArray::fromHex("444d4d5600c7012b"));
@@ -270,6 +335,152 @@ void OutputLoopbackTests::realTcpStreamPreservesClipboardAndInputOrdering()
   QCOMPARE(dragMoves, 2);
   QCOMPARE(packets[packets.size() - 2], QByteArray::fromHex("444d4d56014000f0"));
   QCOMPARE(peer->state(), QAbstractSocket::ConnectedState);
+  stream.close();
+  events.drain();
+}
+
+void OutputLoopbackTests::pausedReceiverPreservesPriorityAndBulkPacing_data()
+{
+  QTest::addColumn<bool>("tls");
+  QTest::newRow("plain TCP") << false;
+  QTest::newRow("TLS") << true;
+}
+
+void OutputLoopbackTests::pausedReceiverPreservesPriorityAndBulkPacing()
+{
+  QFETCH(bool, tls);
+  if (tls && !QSslSocket::supportsSsl())
+    QSKIP("Qt TLS backend unavailable");
+  QTemporaryDir isolated;
+  QVERIFY(isolated.isValid());
+  Settings::setSettingsFile(isolated.filePath("settings.ini"));
+  Settings::setStateFile(isolated.filePath("state.ini"));
+  ProbeServer listener;
+  listener.tls = tls;
+  listener.setProxy(QNetworkProxy::NoProxy);
+  if (tls) {
+    const auto pem = isolated.filePath("probe.pem");
+    deskflow::generatePemSelfSignedCert(pem);
+    Settings::setValue(Settings::Security::Certificate, pem);
+    QFile file(pem);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const auto bytes = file.readAll();
+    listener.certificate = QSslCertificate(bytes, QSsl::Pem);
+    listener.key = QSslKey(bytes, QSsl::Rsa, QSsl::Pem);
+    QVERIFY(!listener.certificate.isNull());
+    QVERIFY(!listener.key.isNull());
+    FingerprintDatabase trusted;
+    trusted.addTrusted({QCryptographicHash::Sha256, listener.certificate.digest(QCryptographicHash::Sha256)});
+    QVERIFY(QDir().mkpath(QFileInfo(Settings::tlsTrustedServersDb()).absolutePath()));
+    QVERIFY(trusted.write(Settings::tlsTrustedServersDb()));
+  }
+  QVERIFY(listener.listen(QHostAddress::LocalHost, 0));
+
+  LoopbackEventQueue events;
+  SocketMultiplexer multiplexer;
+  TCPSocket *socket;
+  if (tls) {
+    auto *secure = new SecureSocket(&events, &multiplexer, IArchNetwork::AddressFamily::INet, SecurityLevel::Encrypted);
+    secure->initSsl(false);
+    socket = secure;
+  } else {
+    socket = new TCPSocket(&events, &multiplexer);
+  }
+  PacketStreamFilter stream(&events, socket, true);
+  bool connected = false;
+  bool failed = false;
+  events.addHandler(
+      tls ? EventTypes::DataSocketSecureConnected : EventTypes::DataSocketConnected, stream.getEventTarget(),
+      [&](const auto &) { connected = true; }
+  );
+  events.addHandler(EventTypes::StreamOutputError, stream.getEventTarget(), [&](const auto &) { failed = true; });
+  events.addHandler(EventTypes::StreamInputShutdown, stream.getEventTarget(), [&](const auto &) { failed = true; });
+  NetworkAddress address("127.0.0.1", listener.serverPort());
+  address.resolve();
+  socket->connect(address);
+  QVERIFY(waitFor(events, [&] {
+    return failed || (connected &&
+                      (tls ? listener.tlsPeer && listener.tlsPeer->isEncrypted() : listener.hasPendingConnections()));
+  }));
+  QVERIFY(!failed);
+  std::unique_ptr<QTcpSocket> peer(tls ? listener.tlsPeer : listener.nextPendingConnection());
+  QVERIFY(peer);
+  peer->setReadBufferSize(1024);
+
+  const std::string payload(512 * 1024, 'Z');
+  const auto declaredSize = std::to_string(payload.size());
+  ProtocolUtil::writef(&stream, kMsgDClipboard, 0, 7, ChunkType::DataStart, &declaredSize);
+  for (size_t offset = 0; offset < payload.size(); offset += 16 * 1024) {
+    const auto chunk = payload.substr(offset, 16 * 1024);
+    ProtocolUtil::writef(&stream, kMsgDClipboard, 0, 7, ChunkType::DataChunk, &chunk);
+  }
+  const std::string empty;
+  ProtocolUtil::writef(&stream, kMsgDClipboard, 0, 7, ChunkType::DataEnd, &empty);
+  // Pause application reads while the real send thread can progress. Filtering
+  // events still runs, reproducing a sender with a non-reading peer.
+  QElapsedTimer paused;
+  paused.start();
+  while (paused.elapsed() < 30) {
+    events.drain();
+    QTest::qWait(1);
+  }
+  QVERIFY2(stream.hasPendingOutput(), "bulk was entirely fed into TCP/TLS during the paused receiver interval");
+  ProtocolUtil::writef(&stream, kMsgDKeyDown1_1, 0x61, 0, 0x1e);
+  ProtocolUtil::writef(&stream, kMsgDMouseDown, 1);
+  ProtocolUtil::writef(&stream, kMsgDMouseMove, 1, 2);
+  ProtocolUtil::writef(&stream, kMsgDMouseMove, 3, 4);
+  ProtocolUtil::writef(&stream, kMsgDMouseUp, 1);
+  ProtocolUtil::writef(&stream, kMsgDMouseWheel, 0, 120);
+  ProtocolUtil::writef(&stream, kMsgDMouseRelMove, 5, 6);
+  ProtocolUtil::writef(&stream, kMsgDKeyDown1_1, 0x76, KeyModifierControl, 0x2f);
+  ProtocolUtil::writef(&stream, kMsgCKeepAlive);
+  ProtocolUtil::writef(&stream, kMsgCLeave);
+
+  QByteArray buffered;
+  QList<QByteArray> packets;
+  QVERIFY(waitFor(events, [&] {
+    buffered.append(peer->readAll());
+    while (buffered.size() >= 4) {
+      const auto size = qFromBigEndian<quint32>(buffered.constData());
+      if (size > 1024 * 1024)
+        return true;
+      if (buffered.size() < 4 + qsizetype(size))
+        break;
+      packets.append(buffered.mid(4, size));
+      buffered.remove(0, 4 + size);
+    }
+    return failed || (!packets.empty() && packets.last() == "COUT");
+  }));
+  QVERIFY(!failed);
+  QVERIFY(buffered.isEmpty());
+  QByteArray assembled;
+  QList<QByteArray> controls;
+  int end = -1;
+  int typing = -1;
+  int heartbeat = -1;
+  int paste = -1;
+  for (qsizetype i = 0; i < packets.size(); ++i) {
+    const auto &packet = packets[i];
+    if (packet.startsWith("DCLP")) {
+      if (quint8(packet[9]) == ChunkType::DataChunk)
+        assembled += packet.mid(14);
+      if (quint8(packet[9]) == ChunkType::DataEnd)
+        end = int(i);
+    } else if (packet.startsWith("CALV")) {
+      heartbeat = int(i);
+    } else if (packet.startsWith("DKDN") && qFromBigEndian<quint16>(packet.constData() + 6) == KeyModifierControl) {
+      paste = int(i);
+    } else if (packet != "COUT") {
+      if (packet.startsWith("DKDN"))
+        typing = int(i);
+      controls.append(packet.first(4));
+    }
+  }
+  QCOMPARE(assembled, QByteArray::fromStdString(payload));
+  QVERIFY(typing >= 0 && typing < end);
+  QVERIFY(heartbeat >= 0 && heartbeat < end);
+  QVERIFY(paste > end);
+  QCOMPARE(controls, (QList<QByteArray>{"DKDN", "DMDN", "DMMV", "DMMV", "DMUP", "DMWM", "DMRM"}));
   stream.close();
   events.drain();
 }

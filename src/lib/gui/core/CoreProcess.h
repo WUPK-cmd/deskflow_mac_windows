@@ -38,7 +38,10 @@ public:
     StartFailed
   };
 
-  explicit CoreProcess(const ServerConfig &serverConfig);
+  explicit CoreProcess(
+      const ServerConfig &serverConfig, const QString &coreSocketName = kCoreIpcName,
+      const QString &daemonSocketName = kDaemonIpcName
+  );
 
   void start(std::optional<ProcessMode> processMode = std::nullopt);
   void stop(std::optional<ProcessMode> processMode = std::nullopt);
@@ -115,6 +118,10 @@ private:
   QString correctedAddress(const QString &address) const;
   void setupDaemonLogTail(const QString &logPath);
   void checkExistingProcess();
+  void connectCoreIpc();
+  void disconnectCoreIpc();
+  void coreIpcDisconnected(bool cleanShutdown);
+  void clearCoreConnectionState();
   static QString makeQuotedArgs(const QString &app, const QStringList &args);
   static QString processModeToString(const Settings::ProcessMode mode);
   static QString processStateToString(const CoreProcess::ProcessState state);
@@ -130,12 +137,17 @@ private:
   std::optional<ProcessMode> m_lastProcessMode = std::nullopt;
   quint64 m_serviceRequestId = 0;
   bool m_serviceStartSent = false;
+  bool m_desiredRunning = false;
+  bool m_restartRequested = false;
+  std::optional<ProcessMode> m_restartProcessMode;
   QTimer m_retryTimer;
+  QTimer m_coreRetryTimer;
   deskflow::gui::ipc::CoreIpcClient *m_coreIpcClient = nullptr;
   deskflow::gui::ipc::DaemonIpcClient *m_daemonIpcClient = nullptr;
   FileTail *m_daemonFileTail = nullptr;
   QProcess *m_process = nullptr;
   QString m_appPath;
+  QString m_coreSocketName;
 };
 
 } // namespace deskflow::gui

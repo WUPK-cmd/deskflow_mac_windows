@@ -93,13 +93,8 @@ void ClientListener::stop()
   LOG_VERBOSE("stop listening for clients");
 
   // discard already connected clients
-  for (auto index = m_newClients.begin(); index != m_newClients.end(); ++index) {
-    ClientProxyUnknown *client = *index;
-    m_events->removeHandler(ClientProxyUnknownSuccess, client);
-    m_events->removeHandler(ClientProxyUnknownFailure, client);
-    m_events->removeHandler(ClientProxyDisconnected, client);
-    delete client;
-  }
+  while (!m_newClients.empty())
+    removeUnknownClient(*m_newClients.begin());
 
   // discard waiting clients
   ClientProxy *client = getNextClient();
@@ -109,6 +104,7 @@ void ClientListener::stop()
   }
 
   m_events->removeHandler(ListenSocketConnecting, m_listen);
+  m_events->removeHandlers(this);
   cleanupListenSocket();
   cleanupClientSockets();
 }
@@ -131,8 +127,21 @@ void ClientListener::handleClientConnecting()
   if (!socket)
     return;
 
-  auto rawSocketPointer = socket.release();
-  m_clientSockets.insert(rawSocketPointer);
+  // Leave ample space below Windows' 64 wait-event limit for the listener,
+  // established peers and wake events. A two-host reconnect can overlap safely.
+  constexpr size_t maxPendingClients = 16;
+  if (m_clientSockets.size() + m_newClients.size() + m_waitingClients.size() >= maxPendingClients) {
+    LOG_WARN("too many clients waiting for handshake");
+    return;
+  }
+
+  auto *rawSocketPointer = socket.get();
+  auto *timer = m_events->newOneShotTimer(30.0, nullptr);
+  m_clientSockets.emplace(rawSocketPointer, PendingSocket{std::move(socket), timer});
+  m_events->addHandler(EventTypes::Timer, timer, [this, rawSocketPointer](const auto &) {
+    LOG_INFO("new client TLS handshake timed out");
+    removeClientSocket(rawSocketPointer);
+  });
 
   m_events->addHandler(
       EventTypes::ClientListenerAccepted, rawSocketPointer->getEventTarget(),
@@ -156,10 +165,21 @@ void ClientListener::handleClientConnecting()
 
 void ClientListener::handleClientAccepted(IDataSocket *socket)
 {
+  auto pending = m_clientSockets.find(socket);
+  if (pending == m_clientSockets.end())
+    return;
+
+  // Transfer the sole owner from the listener to the stream/proxy chain. Remove
+  // every accept callback before StreamFilter replaces the socket handlers.
+  removeAcceptHandlers(socket);
+  auto ownedSocket = std::move(pending->second.socket);
+  m_clientSockets.erase(pending);
+
   LOG_INFO("accepted client connection");
 
   // filter socket messages, including a packetizing filter
-  deskflow::IStream *stream = new PacketStreamFilter(m_events, socket, false);
+  auto stream = std::make_unique<PacketStreamFilter>(m_events, ownedSocket.get(), true);
+  ownedSocket.release();
   assert(m_server != nullptr);
 
   // create proxy for unknown client
@@ -168,7 +188,8 @@ void ClientListener::handleClientAccepted(IDataSocket *socket)
     if (auto *secureSocket = dynamic_cast<SecureSocket *>(socket))
       fingerprint = secureSocket->verifiedPeerFingerprint();
   }
-  auto *client = new ClientProxyUnknown(stream, 30.0, m_server, m_events, std::move(fingerprint));
+  auto *client = new ClientProxyUnknown(stream.get(), 30.0, m_server, m_events, std::move(fingerprint));
+  stream.release();
 
   m_newClients.insert(client);
 
@@ -177,15 +198,7 @@ void ClientListener::handleClientAccepted(IDataSocket *socket)
     handleUnknownClient(client);
   });
   m_events->addHandler(EventTypes::ClientProxyUnknownFailure, client, [this, client](const auto &) {
-    auto *filter = dynamic_cast<StreamFilter *>(client->getStream());
-    IDataSocket *socket = nullptr;
-    if (filter && !filter->adoptedStream()) {
-      socket = dynamic_cast<IDataSocket *>(filter->getStream());
-    }
     removeUnknownClient(client);
-    if (socket) {
-      removeClientSocket(socket);
-    }
   });
 }
 
@@ -223,11 +236,8 @@ void ClientListener::handleClientDisconnected(ClientProxy *client)
       m_waitingClients.erase(i);
       m_events->removeHandler(EventTypes::ClientProxyDisconnected, client);
 
-      // pull out the socket before deleting the client so
-      // we know which socket we no longer need
-      auto *socket = static_cast<IDataSocket *>(client->getStream());
+      // The proxy owns its filter, which owns the actual socket.
       delete client;
-      removeClientSocket(socket);
 
       break;
     }
@@ -236,20 +246,32 @@ void ClientListener::handleClientDisconnected(ClientProxy *client)
 
 void ClientListener::removeClientSocket(IDataSocket *socket)
 {
+  if (!m_clientSockets.contains(socket))
+    return;
+  removeAcceptHandlers(socket);
+  // Erasing the sole owner destroys the socket only after its handlers and
+  // deadline are removed, so queued success/failure events cannot call us.
   m_clientSockets.erase(socket);
+}
+
+void ClientListener::removeAcceptHandlers(IDataSocket *socket)
+{
+  const auto pending = m_clientSockets.find(socket);
+  if (pending == m_clientSockets.end())
+    return;
+  m_events->removeHandler(EventTypes::Timer, pending->second.timer);
+  m_events->deleteTimer(pending->second.timer);
   m_events->removeHandlers(socket->getEventTarget());
-  delete socket;
 }
 
 void ClientListener::cleanupListenSocket()
 {
   delete m_listen;
+  m_listen = nullptr;
 }
 
 void ClientListener::cleanupClientSockets()
 {
-  for (auto client : m_clientSockets) {
-    delete client;
-  }
-  m_clientSockets.clear();
+  while (!m_clientSockets.empty())
+    removeClientSocket(m_clientSockets.begin()->first);
 }

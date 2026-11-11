@@ -1,3 +1,6 @@
+> 本仓库包含 Windows / macOS 键鼠共享的自制版修复。
+> [构建与双端验收说明](../docs/SelfBuilt.md) · [下载同一提交的 Windows / macOS 构建](https://github.com/WUPK-cmd/deskflow_mac_windows/actions/workflows/self-built-ci.yml)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/deskflow/deskflow-artwork/blob/main/logo/deskflow-logo-dark-200px.png?raw=true">
   <source media="(prefers-color-scheme: light)" srcset="https://github.com/deskflow/deskflow-artwork/blob/main/logo/deskflow-logo-light-200px.png?raw=true">

@@ -34,6 +34,7 @@
 #include "platform/OSXScreenSaver.h"
 
 #include <AppKit/NSEvent.h>
+#include <AppKit/NSPasteboard.h>
 #include <AvailabilityMacros.h>
 #include <IOKit/hidsystem/event_status_driver.h>
 #include <dispatch/dispatch.h>
@@ -231,8 +232,13 @@ void *OSXComputer::getEventTarget() const
 
 bool OSXComputer::getClipboard(ClipboardID, IClipboard *dst) const
 {
-  Clipboard::copy(dst, &m_pasteboard);
-  return true;
+  return Clipboard::copy(dst, &m_pasteboard);
+}
+
+uint64_t OSXComputer::clipboardSequenceNumber(ClipboardID) const
+{
+  // Zero is reserved by IPlatformComputer for an unavailable native counter.
+  return static_cast<uint64_t>([[NSPasteboard generalPasteboard] changeCount]) + 1;
 }
 
 void OSXComputer::getShape(int32_t &x, int32_t &y, int32_t &w, int32_t &h) const
@@ -579,6 +585,7 @@ void OSXComputer::fakeMouseButton(ButtonID id, bool press)
   CGEventSetFlags(event, modifiers);
 
   m_buttonState.set(index, state);
+  m_syntheticButtons.set(index, press);
   CGEventPost(kCGHIDEventTap, event);
 
   CFRelease(event);
@@ -625,9 +632,10 @@ void OSXComputer::fakeMouseRelativeMove(int32_t dx, int32_t dy) const
 void OSXComputer::fakeMouseWheel(ScrollDelta delta) const
 {
   if (delta.x != 0 || delta.y != 0) {
-    delta = applyScrollModifier(
-        {static_cast<int32_t>(delta.x / s_scrollDelta), static_cast<int32_t>(delta.y / s_scrollDelta)}
-    );
+    delta = {m_xWheel.add(delta.x, xScrollScale()), m_yWheel.add(delta.y, yScrollScale())};
+    if (delta.x == 0 && delta.y == 0) {
+      return;
+    }
     // create a scroll event, post it and release it.  not sure if kCGScrollEventUnitLine
     // is the right choice here over kCGScrollEventUnitPixel
     CGEventRef scrollEvent = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 2, delta.y, delta.x);
@@ -735,6 +743,7 @@ void OSXComputer::enable()
 
 void OSXComputer::disable()
 {
+  resetSyntheticInput();
   showCursor();
 
   // FIXME -- stop watching jump zones, stop capturing input
@@ -776,6 +785,7 @@ void OSXComputer::disable()
 
 void OSXComputer::enter()
 {
+  resetSyntheticInput();
   m_isOnComputer = true;
   showCursor();
 
@@ -805,6 +815,7 @@ bool OSXComputer::canLeave()
 
 void OSXComputer::leave()
 {
+  resetSyntheticInput();
   hideCursor();
 
   if (m_isPrimary) {
@@ -820,11 +831,22 @@ void OSXComputer::leave()
   m_isOnComputer = false;
 }
 
+void OSXComputer::resetSyntheticInput()
+{
+  // Release using the normal native event path before discarding state. The
+  // physical primary-host button snapshot is deliberately not enumerated.
+  m_syntheticButtons.releaseAll([this](size_t button) {
+    fakeMouseButton(mapMacButtonToDeskflow(static_cast<uint16_t>(button + 1)), false);
+  });
+  m_xWheel.reset();
+  m_yWheel.reset();
+}
+
 bool OSXComputer::setClipboard(ClipboardID, const IClipboard *src)
 {
   if (src != nullptr) {
     LOG_DEBUG("setting clipboard");
-    Clipboard::copy(&m_pasteboard, src);
+    return Clipboard::copy(&m_pasteboard, src);
   }
   return true;
 }

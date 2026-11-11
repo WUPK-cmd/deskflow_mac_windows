@@ -30,8 +30,8 @@ void ClientProxy::close(const char *msg) const
   LOG_VERBOSE("send close \"%s\" to \"%s\"", msg, getName().c_str());
   ProtocolUtil::writef(getStream(), msg);
 
-  // force the close to be sent before we return
-  getStream()->flush();
+  // The stream drains asynchronously. Waiting for a peer that has stopped
+  // reading here would prevent the event queue from enforcing its close timer.
 }
 
 deskflow::IStream *ClientProxy::getStream() const

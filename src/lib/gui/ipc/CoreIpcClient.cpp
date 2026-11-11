@@ -12,14 +12,15 @@
 
 namespace deskflow::gui::ipc {
 
-CoreIpcClient::CoreIpcClient(QObject *parent) : IpcClient(parent, kCoreIpcName, QStringLiteral("core"))
+CoreIpcClient::CoreIpcClient(QObject *parent, const QString &socketName)
+    : IpcClient(parent, socketName, QStringLiteral("core"))
 {
   // do nothing
 }
 
 void CoreIpcClient::sendStop()
 {
-  sendMessage(QStringLiteral("stop"));
+  sendStopMessage();
 }
 
 void CoreIpcClient::processCommand(const QString &command, const QStringList &parts)

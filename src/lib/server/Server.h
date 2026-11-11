@@ -374,6 +374,7 @@ private:
     std::string m_clipboardData;
     std::string m_clipboardOwner;
     uint32_t m_clipboardSeqNum = 0;
+    bool m_pendingCapture = false;
   };
   // Order suggested by clang
 

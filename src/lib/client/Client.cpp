@@ -422,7 +422,8 @@ void Client::sendClipboard(ClipboardID id)
   if (clipboard.open(m_timeClipboard[id])) {
     clipboard.close();
   }
-  m_computer->getClipboard(id, &clipboard);
+  if (!m_computer->getClipboard(id, &clipboard))
+    return;
 
   // check time
   if (m_timeClipboard[id] == 0 || clipboard.getTime() != m_timeClipboard[id]) {
@@ -693,6 +694,7 @@ void Client::handleClipboardGrabbed(const Event &event)
   const auto *info = static_cast<const IComputer::ClipboardInfo *>(event.getData());
 
   // grab ownership
+  m_computer->cancelClipboardRetries(info->m_id);
   m_server->onGrabClipboard(info->m_id);
 
   // we now own the clipboard and it has not been sent to the server

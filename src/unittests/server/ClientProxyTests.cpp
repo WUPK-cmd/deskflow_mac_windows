@@ -70,6 +70,7 @@ public:
 
   void flush() override
   {
+    ++flushCalls;
   }
 
   void shutdownInput() override
@@ -94,6 +95,8 @@ public:
   {
     return 0;
   }
+
+  int flushCalls = 0;
 
 private:
   QByteArray m_buffer;
@@ -191,6 +194,14 @@ void ClientProxyTests::microphoneRequiresPinnedPeerAndOptIn()
   verified.offerMicrophone(options, {});
   QVERIFY(options.empty());
   QVERIFY(!verified.acceptsMicrophone());
+}
+
+void ClientProxyTests::closeQueuesMessageWithoutWaitingForPeer()
+{
+  ProxyUnderTest test(0);
+  test.proxy->close("CBYE");
+  QCOMPARE(test.stream->take(), QByteArray("CBYE"));
+  QCOMPARE(test.stream->flushCalls, 0);
 }
 
 // These formats are frozen because shipped third-party clients parse them byte

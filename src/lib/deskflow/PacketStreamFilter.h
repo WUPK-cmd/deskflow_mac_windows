@@ -16,6 +16,7 @@
 #include <vector>
 
 class IEventQueue;
+class EventQueueTimer;
 
 //! Packetizing stream filter
 /*!
@@ -25,7 +26,7 @@ class PacketStreamFilter : public StreamFilter
 {
 public:
   PacketStreamFilter(IEventQueue *events, deskflow::IStream *stream, bool adoptStream = true);
-  ~PacketStreamFilter() override = default;
+  ~PacketStreamFilter() override;
 
   // IStream overrides
   void close() override;
@@ -47,9 +48,12 @@ private:
   bool readPacketSize();
   bool readMore();
   void rejectInput();
-  void writePacket(const void *buffer, uint32_t count);
+  void writePacket(const void *buffer, uint32_t count, bool paceBulk = true);
   void drainOutput();
   void cancelOutput();
+  void startBulkTimer();
+  void cancelBulkTimer();
+  static bool isPriorityInput(const uint8_t *data, uint32_t count);
 
   struct OutputPacket
   {
@@ -67,5 +71,6 @@ private:
   std::deque<OutputPacket> m_output;
   std::bitset<256> m_mouseButtons;
   bool m_outputShutdown = false;
+  EventQueueTimer *m_bulkTimer = nullptr;
   IEventQueue *m_events = nullptr;
 };

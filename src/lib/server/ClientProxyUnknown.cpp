@@ -79,10 +79,12 @@ void ClientProxyUnknown::sendSuccess()
 
 void ClientProxyUnknown::sendFailure()
 {
+  // The proxy owns the stream after hello negotiation. Unregister its queued
+  // ready/disconnect callbacks before destroying it and losing the target.
+  removeHandlers();
   delete m_proxy;
   m_proxy = nullptr;
   m_ready = false;
-  removeHandlers();
   removeTimer();
   m_events->addEvent(Event(EventTypes::ClientProxyUnknownFailure, this));
 }

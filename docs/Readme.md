@@ -4,6 +4,9 @@ Deskflow is a free and open source keyboard and mouse sharing app. Use the keybo
 
 [Homepage](https://deskflow.org) [Code](https://github.com/deskflow/deskflo)
 
+For this fork's Windows/macOS builds, updates, rollback and native two-host acceptance, see
+[Self-built Windows/macOS](SelfBuilt.md).
+
 ## Getting help online
 
  - View the [wiki](https://github.com/deskflow/deskflow/wiki) Online resource

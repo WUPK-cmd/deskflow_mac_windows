@@ -14,6 +14,8 @@ class OutputLoopbackTests : public QObject
 private Q_SLOTS:
   void initTestCase();
   void realTcpStreamPreservesClipboardAndInputOrdering();
+  void pausedReceiverPreservesPriorityAndBulkPacing_data();
+  void pausedReceiverPreservesPriorityAndBulkPacing();
 
 private:
   Arch m_arch;

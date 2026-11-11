@@ -77,6 +77,18 @@ public:
   */
   virtual bool setClipboard(ClipboardID id, const IClipboard *) = 0;
 
+  // A nonzero native change counter prevents deferred writes replacing a newer local copy.
+  virtual uint64_t clipboardSequenceNumber(ClipboardID) const
+  {
+    return 0;
+  }
+
+  // Some platforms expose both protocol IDs through the same native clipboard.
+  virtual ClipboardID nativeClipboardId(ClipboardID id) const
+  {
+    return id;
+  }
+
   //! Check clipboard owner
   /*!
   Check ownership of all clipboards and post grab events for any that

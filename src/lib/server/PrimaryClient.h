@@ -65,6 +65,8 @@ public:
   */
   void fakeInputEnd();
 
+  void cancelClipboardRetries(ClipboardID);
+
   //@}
   //! @name accessors
   //@{

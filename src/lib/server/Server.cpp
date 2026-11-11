@@ -207,8 +207,8 @@ Server::~Server()
 
   for (auto index = m_oldClients.begin(); index != m_oldClients.end(); ++index) {
     BaseClientProxy *client = index->first;
+    m_events->removeHandler(Timer, index->second);
     m_events->deleteTimer(index->second);
-    m_events->removeHandler(Timer, client);
     m_events->removeHandler(ClientProxyDisconnected, client);
     delete client;
   }
@@ -525,6 +525,8 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
     if (m_enableClipboard) {
       // send the clipboard data to new active computer
       for (ClipboardID id = 0; id < kClipboardEnd; ++id) {
+        if (m_clipboards[id].m_pendingCapture)
+          continue;
         // Hackity hackity hack
         if (m_clipboards[id].m_clipboard.marshall().size() > (m_maximumClipboardSize * 1024)) {
           continue;
@@ -1223,6 +1225,9 @@ void Server::handleClipboardGrabbed(const Event &event, BaseClientProxy *grabber
   );
   clipboard.m_clipboardOwner = getName(grabber);
   clipboard.m_clipboardSeqNum = info->m_sequenceNumber;
+  clipboard.m_pendingCapture = true;
+  if (grabber == m_primaryClient)
+    m_primaryClient->cancelClipboardRetries(info->m_id);
 
   // clear the clipboard data (since it's not known at this point)
   if (clipboard.m_clipboard.open(0)) {
@@ -1486,7 +1491,13 @@ void Server::onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, u
   assert(sender == m_clients.find(clipboard.m_clipboardOwner)->second);
 
   // get data
-  sender->getClipboard(id, &clipboard.m_clipboard);
+  Clipboard captured;
+  if (!sender->getClipboard(id, &captured)) {
+    clipboard.m_pendingCapture = true;
+    return;
+  }
+  Clipboard::copy(&clipboard.m_clipboard, &captured);
+  clipboard.m_pendingCapture = false;
 
   std::string data = clipboard.m_clipboard.marshall();
   if (data.size() > m_maximumClipboardSize * 1024) {
@@ -1994,11 +2005,6 @@ void Server::closeClient(BaseClientProxy *client, const char *msg)
   // client.
   LOG_INFO("disconnecting client \"%s\"", getName(client).c_str());
 
-  // send message
-  // FIXME -- avoid type cast (kinda hard, though)
-  auto clientProxy = static_cast<ClientProxy *>(client);
-  clientProxy->close(msg);
-
   // install timer.  wait timeout seconds for client to close.
   double timeout = 5.0;
   EventQueueTimer *timer = m_events->newOneShotTimer(timeout, nullptr);
@@ -2012,6 +2018,10 @@ void Server::closeClient(BaseClientProxy *client, const char *msg)
   // if this client is the active computer then we have to
   // jump off of it
   forceLeaveClient(client);
+
+  // Queue close only after the deadline and closing state are installed. The
+  // socket drains on the multiplexer without blocking this event thread.
+  static_cast<ClientProxy *>(client)->close(msg);
 }
 
 void Server::closeClients(const ServerConfig &config)

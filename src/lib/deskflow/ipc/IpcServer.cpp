@@ -136,6 +136,11 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
     m_readyClients.insert(clientSocket);
     writeToClientSocket(clientSocket, QStringLiteral("hello=%1").arg(versionId));
 
+    // Current state belongs to every GUI, including one adopting an orphaned
+    // core. Unlike one-off notifications it must survive the first handshake.
+    for (const auto &state : std::as_const(m_stateMessages))
+      writeToClientSocket(clientSocket, state);
+
     // Replay messages that were queued before any clients connected.
     LOG_VERBOSE("ipc server replaying %d pending messages", m_pendingMessages.size());
     for (const auto &pending : std::as_const(m_pendingMessages)) {
@@ -159,12 +164,17 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
 void IpcServer::broadcastCommand(const QString &command, const QString &args)
 {
   const auto message = args.isEmpty() ? command : QStringLiteral("%1=%2").arg(command, args);
+  const bool stateMessage = command == QStringLiteral("connectionState") ||
+                            command == QStringLiteral("connectedClients") || command == QStringLiteral("secureSocket");
+  if (stateMessage)
+    m_stateMessages.insert(command, message);
 
   if (m_readyClients.isEmpty()) {
     LOG_VERBOSE(
         "%s ipc server has no clients, message queued: %s", m_typeName.constData(), message.toUtf8().constData()
     );
-    m_pendingMessages.append(message);
+    if (!stateMessage)
+      m_pendingMessages.append(message);
     return;
   }
 

@@ -7,6 +7,7 @@
 #pragma once
 
 #include "IpcClient.h"
+#include "common/Constants.h"
 
 #include <QObject>
 
@@ -17,7 +18,7 @@ class CoreIpcClient : public IpcClient
   Q_OBJECT
 
 public:
-  explicit CoreIpcClient(QObject *parent = nullptr);
+  explicit CoreIpcClient(QObject *parent = nullptr, const QString &socketName = kCoreIpcName);
 
   void sendStop();
 

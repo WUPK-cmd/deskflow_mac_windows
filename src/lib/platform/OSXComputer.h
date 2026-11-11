@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "platform/InputState.h"
+
 #include "deskflow/PlatformComputer.h"
 #include "platform/OSXClipboard.h"
 #include "platform/OSXPowerManager.h"
@@ -57,6 +59,11 @@ public:
   // IComputer overrides
   void *getEventTarget() const override;
   bool getClipboard(ClipboardID id, IClipboard *) const override;
+  uint64_t clipboardSequenceNumber(ClipboardID) const override;
+  ClipboardID nativeClipboardId(ClipboardID) const override
+  {
+    return kClipboardClipboard;
+  }
   void getShape(int32_t &x, int32_t &y, int32_t &width, int32_t &height) const override;
   void getCursorPos(int32_t &x, int32_t &y) const override;
 
@@ -107,6 +114,7 @@ private:
   bool updateComputerShape();
   bool updateComputerShape(const CGDirectDisplayID, const CGDisplayChangeSummaryFlags);
   void postMouseEvent(CGPoint &) const;
+  void resetSyntheticInput();
 
   // convenience function to send events
   void sendEvent(EventTypes type, void * = nullptr) const;
@@ -245,6 +253,10 @@ private:
      Evil, and this should be moved to a place where it need not
      be mutable as soon as possible. */
   mutable MouseButtonState m_buttonState;
+  // Unlike m_buttonState, this ledger is never populated by physical input.
+  deskflow::platform::SyntheticMouseButtons<NumButtonIDs> m_syntheticButtons;
+  mutable deskflow::platform::WheelAccumulator m_xWheel;
+  mutable deskflow::platform::WheelAccumulator m_yWheel;
   using MouseButtonEventMapType = std::map<uint16_t, CGEventType>;
   std::vector<MouseButtonEventMapType> MouseButtonEventMap;
 

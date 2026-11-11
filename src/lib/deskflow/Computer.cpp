@@ -8,6 +8,7 @@
 #include "deskflow/Computer.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "deskflow/Clipboard.h"
 #include "deskflow/IPlatformComputer.h"
 
 #include <QProcess>
@@ -61,6 +62,7 @@ Computer::Computer(IPlatformComputer *platformComputer, IEventQueue *events)
 
 Computer::~Computer()
 {
+  clearClipboardRetries();
 
   if (m_enabled) {
     disable();
@@ -114,6 +116,7 @@ void Computer::enable()
 void Computer::disable()
 {
   assert(m_enabled);
+  clearClipboardRetries();
 
   if (!m_isPrimary && m_entered) {
     leave();
@@ -204,14 +207,106 @@ void Computer::warpCursor(int32_t x, int32_t y)
   m_computer->warpCursor(x, y);
 }
 
-void Computer::setClipboard(ClipboardID id, const IClipboard *clipboard)
+bool Computer::setClipboard(ClipboardID id, const IClipboard *clipboard)
 {
-  m_computer->setClipboard(id, clipboard);
+  if (id >= kClipboardEnd)
+    return false;
+  cancelClipboardRetries(id);
+  const auto generation = m_computer->clipboardSequenceNumber(id);
+  if (m_computer->setClipboard(id, clipboard))
+    return true;
+
+  auto &retry = m_clipboardRetries[id];
+  retry.write = true;
+  retry.generation = generation;
+  if (clipboard) {
+    retry.data = std::make_unique<Clipboard>();
+    Clipboard::copy(retry.data.get(), clipboard);
+  }
+  armClipboardRetry();
+  return false;
 }
 
 void Computer::grabClipboard(ClipboardID id)
 {
-  m_computer->setClipboard(id, nullptr);
+  setClipboard(id, nullptr);
+}
+
+bool Computer::hasClipboardRetries() const
+{
+  for (const auto &retry : m_clipboardRetries)
+    if (retry.read || retry.write)
+      return true;
+  return false;
+}
+
+void Computer::cancelClipboardRetries(ClipboardID id)
+{
+  if (id < kClipboardEnd) {
+    const auto nativeId = m_computer->nativeClipboardId(id);
+    for (ClipboardID pendingId = 0; pendingId < kClipboardEnd; ++pendingId)
+      if (m_computer->nativeClipboardId(pendingId) == nativeId)
+        m_clipboardRetries[pendingId] = {};
+  }
+  if (!hasClipboardRetries() && m_clipboardRetryTimer) {
+    m_events->removeHandler(EventTypes::Timer, m_clipboardRetryTimer);
+    m_events->deleteTimer(m_clipboardRetryTimer);
+    m_clipboardRetryTimer = nullptr;
+  }
+}
+
+void Computer::clearClipboardRetries()
+{
+  for (ClipboardID id = 0; id < kClipboardEnd; ++id)
+    cancelClipboardRetries(id);
+}
+
+void Computer::armClipboardRetry()
+{
+  if (m_clipboardRetryTimer || !hasClipboardRetries())
+    return;
+  m_clipboardRetryTimer = m_events->newOneShotTimer(0.05, nullptr);
+  m_events->addHandler(EventTypes::Timer, m_clipboardRetryTimer, [this](const auto &) { retryClipboards(); });
+}
+
+void Computer::retryClipboards()
+{
+  m_events->removeHandler(EventTypes::Timer, m_clipboardRetryTimer);
+  m_events->deleteTimer(m_clipboardRetryTimer);
+  m_clipboardRetryTimer = nullptr;
+  for (ClipboardID id = 0; id < kClipboardEnd; ++id) {
+    auto &retry = m_clipboardRetries[id];
+    if (!retry.read && !retry.write)
+      continue;
+    bool success = false;
+    if (retry.write) {
+      const auto generation = m_computer->clipboardSequenceNumber(id);
+      if (retry.generation && generation && retry.generation != generation) {
+        retry = {};
+        m_computer->checkClipboards();
+        continue;
+      }
+      success = m_computer->setClipboard(id, retry.data.get());
+    } else {
+      Clipboard captured;
+      success = m_computer->getClipboard(id, &captured);
+      if (success) {
+        auto *info = static_cast<IComputer::ClipboardInfo *>(std::malloc(sizeof(IComputer::ClipboardInfo)));
+        if (info) {
+          *info = {id, m_clipboardSequenceNumber};
+          m_events->addEvent(Event(EventTypes::ClipboardGrabbed, getEventTarget(), info));
+        } else
+          success = false;
+      }
+    }
+    if (success) {
+      retry = {};
+    } else if (++retry.attempts >= 40) {
+      LOG_WARN("clipboard %d remains busy after deferred retries", id);
+      retry = {};
+    }
+  }
+  armClipboardRetry();
 }
 
 void Computer::screensaver(bool) const
@@ -321,6 +416,7 @@ void Computer::setOptions(const OptionsList &options)
 
 void Computer::setSequenceNumber(uint32_t seqNum)
 {
+  m_clipboardSequenceNumber = seqNum;
   m_computer->setSequenceNumber(seqNum);
 }
 
@@ -396,7 +492,18 @@ void *Computer::getEventTarget() const
 
 bool Computer::getClipboard(ClipboardID id, IClipboard *clipboard) const
 {
-  return m_computer->getClipboard(id, clipboard);
+  if (id >= kClipboardEnd)
+    return false;
+  if (m_computer->getClipboard(id, clipboard)) {
+    auto *self = const_cast<Computer *>(this);
+    if (self->m_clipboardRetries[id].read && !self->m_clipboardRetries[id].write)
+      self->cancelClipboardRetries(id);
+    return true;
+  }
+  auto *self = const_cast<Computer *>(this);
+  self->m_clipboardRetries[id].read = true;
+  self->armClipboardRetry();
+  return false;
 }
 
 void Computer::getShape(int32_t &x, int32_t &y, int32_t &w, int32_t &h) const

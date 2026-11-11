@@ -24,14 +24,8 @@ Q_SIGNALS:
   void updateFound(const QString &version);
 
 private:
+  friend class VersionCheckerTests;
   static int compareVersions(const QString &left, const QString &right);
 
-  /**
-   * \brief Converts a string stage to a integer value
-   * \param stage The string containing the stage version
-   * \return An integer representation of the stage, the higher the number the
-   * more recent the version
-   */
-  static int getStageVersion(QString stage);
   QNetworkAccessManager *m_network = nullptr;
 };

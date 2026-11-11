@@ -154,9 +154,6 @@ void ServerApp::closeServer(Server *server)
     return;
   }
 
-  // tell all clients to disconnect
-  server->disconnect();
-
   // wait for clients to disconnect for up to timeout seconds
   double timeout = 3.0;
   EventQueueTimer *timer = getEvents()->newOneShotTimer(timeout, nullptr);
@@ -166,6 +163,9 @@ void ServerApp::closeServer(Server *server)
   getEvents()->addHandler(EventTypes::ServerDisconnected, server, [this](const auto &) {
     getEvents()->addEvent(Event(EventTypes::Quit));
   });
+
+  // Install the outer deadline before initiating any client close.
+  server->disconnect();
 
   getEvents()->loop();
 

@@ -63,6 +63,12 @@ void Settings::setStateFile(const QString &stateFile)
 
 void Settings::clearState()
 {
+  if (isPortableMode()) {
+    for (const auto &key : m_stateKeys)
+      instance()->m_settings->remove(key);
+    instance()->m_settings->sync();
+    return;
+  }
   instance()->m_stateSettings->clear();
   instance()->m_stateSettings->sync();
 }

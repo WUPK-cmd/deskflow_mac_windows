@@ -522,6 +522,7 @@ void ServerProxy::enter()
   m_compressMouseRelative = false;
   m_dxMouse = 0;
   m_dyMouse = 0;
+  m_mouseButtons.reset();
   m_seqNum = seqNum;
 
   // forward
@@ -538,6 +539,7 @@ void ServerProxy::leave()
 
   // forward
   m_client->leave();
+  m_mouseButtons.reset();
 }
 
 void ServerProxy::setClipboard()
@@ -642,6 +644,8 @@ void ServerProxy::mouseDown()
   ProtocolUtil::readf(m_stream, kMsgDMouseDown + 4, &id);
   LOG_VERBOSE("recv mouse down id=%d", id);
 
+  m_mouseButtons.set(static_cast<ButtonID>(id));
+
   // forward
   m_client->mouseDown(static_cast<ButtonID>(id));
 }
@@ -656,6 +660,8 @@ void ServerProxy::mouseUp()
   ProtocolUtil::readf(m_stream, kMsgDMouseUp + 4, &id);
   LOG_VERBOSE("recv mouse up id=%d", id);
 
+  m_mouseButtons.reset(static_cast<ButtonID>(id));
+
   // forward
   m_client->mouseUp(static_cast<ButtonID>(id));
 }
@@ -668,11 +674,17 @@ void ServerProxy::mouseMove()
   int16_t y;
   ProtocolUtil::readf(m_stream, kMsgDMouseMove + 4, &x, &y);
 
+  // A change of coordinate mode is an ordering barrier: relative movement
+  // must be applied before this absolute position replaces its destination.
+  if (m_compressMouseRelative) {
+    flushCompressedMouse();
+  }
+
   // note if we should ignore the move
   ignore = m_ignoreMouse;
 
   // compress mouse motion events if more input follows
-  if (!ignore && !m_compressMouse && m_stream->isReady()) {
+  if (!ignore && m_mouseButtons.none() && !m_compressMouse && m_stream->isReady()) {
     m_compressMouse = true;
   }
 
@@ -700,6 +712,11 @@ void ServerProxy::mouseRelativeMove()
   int16_t dx;
   int16_t dy;
   ProtocolUtil::readf(m_stream, kMsgDMouseRelMove + 4, &dx, &dy);
+
+  // Apply the preceding absolute position before adding a relative delta.
+  if (m_compressMouse) {
+    flushCompressedMouse();
+  }
 
   // note if we should ignore the move
   ignore = m_ignoreMouse;

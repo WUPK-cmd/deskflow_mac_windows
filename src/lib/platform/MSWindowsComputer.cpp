@@ -414,8 +414,12 @@ void *MSWindowsComputer::getEventTarget() const
 bool MSWindowsComputer::getClipboard(ClipboardID, IClipboard *dst) const
 {
   MSWindowsClipboard src(m_window);
-  Clipboard::copy(dst, &src);
-  return true;
+  return Clipboard::copy(dst, &src);
+}
+
+uint64_t MSWindowsComputer::clipboardSequenceNumber(ClipboardID) const
+{
+  return GetClipboardSequenceNumber();
 }
 
 void MSWindowsComputer::getShape(int32_t &x, int32_t &y, int32_t &w, int32_t &h) const

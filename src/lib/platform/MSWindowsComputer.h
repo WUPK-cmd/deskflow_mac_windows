@@ -57,6 +57,11 @@ public:
   // IComputer overrides
   void *getEventTarget() const override;
   bool getClipboard(ClipboardID id, IClipboard *) const override;
+  uint64_t clipboardSequenceNumber(ClipboardID) const override;
+  ClipboardID nativeClipboardId(ClipboardID) const override
+  {
+    return kClipboardClipboard;
+  }
   void getShape(int32_t &x, int32_t &y, int32_t &width, int32_t &height) const override;
   void getCursorPos(int32_t &x, int32_t &y) const override;
 

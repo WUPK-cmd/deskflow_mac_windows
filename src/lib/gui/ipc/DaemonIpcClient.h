@@ -7,6 +7,7 @@
 #pragma once
 
 #include "IpcClient.h"
+#include "common/Constants.h"
 
 #include <QObject>
 
@@ -17,7 +18,7 @@ class DaemonIpcClient : public IpcClient
   Q_OBJECT
 
 public:
-  explicit DaemonIpcClient(QObject *parent = nullptr);
+  explicit DaemonIpcClient(QObject *parent = nullptr, const QString &socketName = kDaemonIpcName);
   void sendLogLevel(const QString &logLevel);
   void sendStartProcess(quint64 requestId, const QString &mode, const QString &configFile);
   void sendStopProcess();

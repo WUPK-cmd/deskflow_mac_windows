@@ -70,6 +70,17 @@ public:
     return delta;
   }
 
+protected:
+  double xScrollScale() const
+  {
+    return m_invertXScroll ? -m_xScrollScale : m_xScrollScale;
+  }
+
+  double yScrollScale() const
+  {
+    return m_invertYScroll ? -m_yScrollScale : m_yScrollScale;
+  }
+
 private:
   /**
    * @brief this member is used to modify the verical scroll direction.

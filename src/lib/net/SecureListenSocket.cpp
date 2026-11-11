@@ -32,9 +32,12 @@ std::unique_ptr<IDataSocket> SecureListenSocket::accept()
 {
   std::unique_ptr<SecureSocket> secureSocket;
   try {
-    secureSocket = std::make_unique<SecureSocket>(
-        events(), socketMultiplexer(), ARCH->acceptSocket(socket(), nullptr), m_securityLevel
-    );
+    auto *accepted = ARCH->acceptSocket(socket(), nullptr);
+    if (!accepted) {
+      setListeningJob();
+      return nullptr;
+    }
+    secureSocket = std::make_unique<SecureSocket>(events(), socketMultiplexer(), accepted, m_securityLevel);
     secureSocket->initSsl(true);
 
     setListeningJob();
@@ -48,14 +51,10 @@ std::unique_ptr<IDataSocket> SecureListenSocket::accept()
 
     return secureSocket;
   } catch (ArchNetworkException &) {
-    if (secureSocket) {
-      setListeningJob();
-    }
+    setListeningJob();
     return nullptr;
-  } catch (std::exception &ex) {
-    if (secureSocket) {
-      setListeningJob();
-    }
-    throw ex;
+  } catch (...) {
+    setListeningJob();
+    throw;
   }
 }
