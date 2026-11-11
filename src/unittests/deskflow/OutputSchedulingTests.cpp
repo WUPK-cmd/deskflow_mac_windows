@@ -169,8 +169,7 @@ public:
     return 0;
   }
 
-  // Intentionally also compiles against the old IStream, before this becomes virtual.
-  bool hasPendingOutput() const
+  bool hasPendingOutput() const override
   {
     return m_pending;
   }
