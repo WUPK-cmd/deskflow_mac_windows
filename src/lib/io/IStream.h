@@ -102,6 +102,12 @@ public:
   */
   virtual uint32_t getSize() const = 0;
 
+  //! Whether output is still buffered. Unbuffered streams return false.
+  virtual bool hasPendingOutput() const
+  {
+    return false;
+  }
+
   //@}
 };
 

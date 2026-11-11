@@ -6,6 +6,22 @@ if(WIN32)
 endif()
 
 create_test(
+  NAME OutputSchedulingTests
+  DEPENDS app
+  LIBS arch base io ${extra_libs}
+  SOURCE OutputSchedulingTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/deskflow"
+)
+
+create_test(
+  NAME OutputLoopbackTests
+  DEPENDS app
+  LIBS arch base io mt net ${extra_libs}
+  SOURCE OutputLoopbackTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/deskflow"
+)
+
+create_test(
   NAME ClipboardTests
   DEPENDS app
   LIBS arch base io ${extra_libs}

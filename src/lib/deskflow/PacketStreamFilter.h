@@ -10,7 +10,10 @@
 #include "io/StreamBuffer.h"
 #include "io/StreamFilter.h"
 
+#include <bitset>
+#include <deque>
 #include <mutex>
+#include <vector>
 
 class IEventQueue;
 
@@ -28,9 +31,12 @@ public:
   void close() override;
   uint32_t read(void *buffer, uint32_t n) override;
   void write(const void *buffer, uint32_t n) override;
+  void flush() override;
   void shutdownInput() override;
+  void shutdownOutput() override;
   bool isReady() const override;
   uint32_t getSize() const override;
+  bool hasPendingOutput() const override;
 
 protected:
   // StreamFilter overrides
@@ -41,6 +47,16 @@ private:
   bool readPacketSize();
   bool readMore();
   void rejectInput();
+  void writePacket(const void *buffer, uint32_t count);
+  void drainOutput();
+  void cancelOutput();
+
+  struct OutputPacket
+  {
+    std::vector<uint8_t> data;
+    bool position;
+    bool clipboard;
+  };
 
 private:
   mutable std::mutex m_mutex;
@@ -48,5 +64,8 @@ private:
   StreamBuffer m_buffer;
   bool m_inputShutdown = false;
   bool m_inputFailed = false;
+  std::deque<OutputPacket> m_output;
+  std::bitset<256> m_mouseButtons;
+  bool m_outputShutdown = false;
   IEventQueue *m_events = nullptr;
 };

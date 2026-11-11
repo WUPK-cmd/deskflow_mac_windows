@@ -13,7 +13,7 @@
 
 #include <algorithm>
 
-static constexpr size_t kChunkSize = 512 * 1024;
+static constexpr size_t kChunkSize = 16 * 1024;
 
 void StreamChunker::sendClipboard(
     std::string_view data, ClipboardID id, uint32_t sequence, IEventQueue *events, void *eventTarget

@@ -76,6 +76,11 @@ uint32_t StreamFilter::getSize() const
   return getStream()->getSize();
 }
 
+bool StreamFilter::hasPendingOutput() const
+{
+  return getStream()->hasPendingOutput();
+}
+
 deskflow::IStream *StreamFilter::getStream() const
 {
   return m_stream;

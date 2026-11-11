@@ -27,6 +27,7 @@ void PacketStreamFilter::close()
   std::scoped_lock lock{m_mutex};
   m_size = 0;
   m_buffer.pop(m_buffer.getSize());
+  cancelOutput();
   StreamFilter::close();
 }
 
@@ -73,6 +74,50 @@ void PacketStreamFilter::write(const void *buffer, uint32_t count)
   if (count == 0)
     return;
 
+  const auto *data = static_cast<const uint8_t *>(buffer);
+  std::scoped_lock lock{m_mutex};
+  if (m_outputShutdown) {
+    m_events->addEvent(Event(EventTypes::StreamOutputError, getEventTarget()));
+    return;
+  }
+
+  if (count == 5) {
+    if (memcmp(data, kMsgDMouseDown, 4) == 0)
+      m_mouseButtons.set(data[4]);
+    else if (memcmp(data, kMsgDMouseUp, 4) == 0)
+      m_mouseButtons.reset(data[4]);
+  }
+
+  // Keep the uncontended input path allocation-free.
+  if (m_output.empty() && !getStream()->hasPendingOutput()) {
+    writePacket(buffer, count);
+    return;
+  }
+
+  OutputPacket packet{
+      std::vector<uint8_t>(data, data + count),
+      count == 8 && memcmp(data, kMsgDMouseMove, 4) == 0 && m_mouseButtons.none(),
+      count >= 4 && memcmp(data, kMsgDClipboard, 4) == 0
+  };
+  if (packet.position) {
+    // Only cross queued clipboard packets. Every reliable control packet is a
+    // barrier, including relative motion and every move within a held-button drag.
+    auto start = m_output.size();
+    while (start > 0 && (m_output[start - 1].position || m_output[start - 1].clipboard))
+      --start;
+
+    if (start < m_output.size() && m_output[start].position)
+      m_output[start] = std::move(packet);
+    else
+      m_output.insert(m_output.begin() + static_cast<std::ptrdiff_t>(start), std::move(packet));
+  } else {
+    m_output.push_back(std::move(packet));
+  }
+  drainOutput();
+}
+
+void PacketStreamFilter::writePacket(const void *buffer, uint32_t count)
+{
   constexpr uint32_t headerSize = 4;
   constexpr uint32_t smallPayloadSize = 64;
   uint8_t packet[headerSize + smallPayloadSize];
@@ -90,6 +135,50 @@ void PacketStreamFilter::write(const void *buffer, uint32_t count)
 
   getStream()->write(packet, headerSize);
   getStream()->write(buffer, count);
+}
+
+void PacketStreamFilter::drainOutput()
+{
+  // A buffered socket resumes here on output completion. Unbuffered streams can
+  // consume the queue immediately without relying on a completion notification.
+  while (!m_outputShutdown && !m_output.empty() && !getStream()->hasPendingOutput()) {
+    auto packet = std::move(m_output.front());
+    m_output.pop_front();
+    writePacket(packet.data.data(), static_cast<uint32_t>(packet.data.size()));
+  }
+}
+
+void PacketStreamFilter::cancelOutput()
+{
+  m_outputShutdown = true;
+  m_output.clear();
+  m_mouseButtons.reset();
+}
+
+void PacketStreamFilter::flush()
+{
+  {
+    std::scoped_lock lock{m_mutex};
+    while (!m_output.empty()) {
+      auto packet = std::move(m_output.front());
+      m_output.pop_front();
+      writePacket(packet.data.data(), static_cast<uint32_t>(packet.data.size()));
+    }
+  }
+  StreamFilter::flush();
+}
+
+void PacketStreamFilter::shutdownOutput()
+{
+  std::scoped_lock lock{m_mutex};
+  cancelOutput();
+  StreamFilter::shutdownOutput();
+}
+
+bool PacketStreamFilter::hasPendingOutput() const
+{
+  std::scoped_lock lock{m_mutex};
+  return !m_output.empty() || getStream()->hasPendingOutput();
 }
 
 void PacketStreamFilter::shutdownInput()
@@ -177,7 +266,16 @@ bool PacketStreamFilter::readMore()
 
 void PacketStreamFilter::filterEvent(const Event &event)
 {
-  if (event.getType() == EventTypes::StreamInputReady) {
+  if (event.getType() == EventTypes::StreamOutputFlushed) {
+    std::scoped_lock lock{m_mutex};
+    drainOutput();
+    if (!m_output.empty() || getStream()->hasPendingOutput())
+      return;
+  } else if (event.getType() == EventTypes::StreamOutputError || event.getType() == EventTypes::StreamOutputShutdown ||
+             event.getType() == EventTypes::SocketDisconnected) {
+    std::scoped_lock lock{m_mutex};
+    cancelOutput();
+  } else if (event.getType() == EventTypes::StreamInputReady) {
     std::scoped_lock lock{m_mutex};
     if (!readMore()) {
       return;
