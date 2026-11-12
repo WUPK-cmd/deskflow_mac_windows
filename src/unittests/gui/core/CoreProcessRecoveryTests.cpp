@@ -27,7 +27,12 @@ namespace {
 
 QString endpoint()
 {
-  return QStringLiteral("deskflow-recovery-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  // macOS TMPDIR can leave too little room for a Unix socket's pathname.
+#if defined(Q_OS_MACOS)
+  return QStringLiteral("/tmp/df-recovery-%1").arg(QUuid::createUuid().toString(QUuid::Id128));
+#else
+  return QStringLiteral("df-recovery-%1").arg(QUuid::createUuid().toString(QUuid::Id128));
+#endif
 }
 
 // In-process wire peers replace only OS process/service launch; the production
@@ -61,7 +66,7 @@ public:
       }
     });
     if (!listen(name))
-      qFatal("cannot create isolated IPC peer");
+      qFatal("cannot create isolated IPC peer %s: %s", qPrintable(name), qPrintable(errorString()));
   }
 
   int starts() const

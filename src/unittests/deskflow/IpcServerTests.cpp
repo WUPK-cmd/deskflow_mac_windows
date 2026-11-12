@@ -19,6 +19,16 @@
 
 namespace {
 
+QString endpoint()
+{
+  // macOS TMPDIR can leave too little room for a Unix socket's pathname.
+#if defined(Q_OS_MACOS)
+  return QStringLiteral("/tmp/df-ipc-%1").arg(QUuid::createUuid().toString(QUuid::Id128));
+#else
+  return QStringLiteral("df-ipc-%1").arg(QUuid::createUuid().toString(QUuid::Id128));
+#endif
+}
+
 class TestServer : public deskflow::core::ipc::IpcServer
 {
 public:
@@ -58,7 +68,7 @@ private:
 
 void IpcServerTests::retainsPartialLineAfterHandshake()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   TestServer server(name);
   server.listen();
 
@@ -79,7 +89,7 @@ void IpcServerTests::retainsPartialLineAfterHandshake()
 
 void IpcServerTests::rejectsCommandBeforeHandshake()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   TestServer server(name);
   server.listen();
 
@@ -93,13 +103,13 @@ void IpcServerTests::rejectsCommandBeforeHandshake()
 
 void IpcServerTests::cancelledClientStopsRetrying()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   deskflow::gui::ipc::IpcClient client(nullptr, name, QStringLiteral("test"));
   client.connectToServer();
   client.disconnectFromServer();
 
   QLocalServer server;
-  QVERIFY(server.listen(name));
+  QVERIFY2(server.listen(name), qPrintable(server.errorString()));
   // Give a previously scheduled retry time to run.
   QTest::qWait(650);
   QVERIFY(!server.hasPendingConnections());
@@ -110,9 +120,9 @@ void IpcServerTests::cancelledClientStopsRetrying()
 
 void IpcServerTests::clientRejectsOversizedLine()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   QLocalServer server;
-  QVERIFY(server.listen(name));
+  QVERIFY2(server.listen(name), qPrintable(server.errorString()));
 
   deskflow::gui::ipc::IpcClient client(nullptr, name, QStringLiteral("test"));
   QSignalSpy failed(&client, &deskflow::gui::ipc::IpcClient::connectionFailed);
@@ -125,9 +135,9 @@ void IpcServerTests::clientRejectsOversizedLine()
 
 void IpcServerTests::mismatchDoesNotEstablishControl()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   QLocalServer server;
-  QVERIFY(server.listen(name));
+  QVERIFY2(server.listen(name), qPrintable(server.errorString()));
   deskflow::gui::ipc::CoreIpcClient client(nullptr, name);
   QSignalSpy mismatch(&client, &deskflow::gui::ipc::IpcClient::versionMismatch);
   client.connectToServer();
@@ -142,9 +152,9 @@ void IpcServerTests::mismatchDoesNotEstablishControl()
 
 void IpcServerTests::compatibleMismatchCanStopAfterExplicitHandshake()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   QLocalServer server;
-  QVERIFY(server.listen(name));
+  QVERIFY2(server.listen(name), qPrintable(server.errorString()));
   deskflow::gui::ipc::CoreIpcClient client(nullptr, name);
   QSignalSpy mismatch(&client, &deskflow::gui::ipc::IpcClient::versionMismatch);
   QSignalSpy shutdown(&client, &deskflow::gui::ipc::IpcClient::serverShutdown);
@@ -169,9 +179,9 @@ void IpcServerTests::compatibleMismatchCanStopAfterExplicitHandshake()
 
 void IpcServerTests::incompatibleMismatchCannotStop()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   QLocalServer server;
-  QVERIFY(server.listen(name));
+  QVERIFY2(server.listen(name), qPrintable(server.errorString()));
   deskflow::gui::ipc::CoreIpcClient client(nullptr, name);
   QSignalSpy mismatch(&client, &deskflow::gui::ipc::IpcClient::versionMismatch);
   QSignalSpy failed(&client, &deskflow::gui::ipc::IpcClient::connectionFailed);
@@ -190,7 +200,7 @@ void IpcServerTests::incompatibleMismatchCannotStop()
 
 void IpcServerTests::replaysCurrentStateToEveryClient()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   TestServer server(name);
   server.listen();
   server.broadcastCommand(QStringLiteral("connectionState"), QStringLiteral("Connecting"));
@@ -214,9 +224,9 @@ void IpcServerTests::replaysCurrentStateToEveryClient()
 
 void IpcServerTests::byeWaitsForTransportClose()
 {
-  const auto name = QStringLiteral("deskflow-test-%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  const auto name = endpoint();
   QLocalServer server;
-  QVERIFY(server.listen(name));
+  QVERIFY2(server.listen(name), qPrintable(server.errorString()));
   deskflow::gui::ipc::CoreIpcClient client(nullptr, name);
   QSignalSpy connected(&client, &deskflow::gui::ipc::IpcClient::connected);
   QSignalSpy shutdown(&client, &deskflow::gui::ipc::IpcClient::serverShutdown);
