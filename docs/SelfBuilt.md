@@ -187,7 +187,7 @@ screenshot of an open window does not establish successful paste, release, recon
 | Identity and pairing | Launch both reviewed runtimes by full path. Check commit parity, About/version output, loaded GUI/Core paths, role, screen arrangement and existing TLS trust. Stop/Start in GUI; state and real connectivity agree. |
 | Text, HTML and images | In both directions paste ASCII, Chinese/emoji/multiline text, rich HTML with formatting/links and a known image into suitable native target apps. Compare actual content, formatting, dimensions and image appearance; check clipboard formats where possible. |
 | Rapid copy | Copy at least 20 numbered distinct values quickly, then paste after the final copy. The final value must arrive without stale overwrite; repeat with HTML and images, and after crossing back to the source screen. |
-| Clipboard busy | Temporarily hold Windows `OpenClipboard` from a separate test helper for a few seconds while a Mac copy is delivered. Release the lock without another copy and verify the pending content arrives. Repeat a Windows read while another app holds it; verify recovery and responsive input. Record lock duration/helper log. |
+| Clipboard busy | Hold Windows `OpenClipboard` for one second while a Mac copy is delivered. Coordinate the copy so delivery occurs during the lock; after release, verify the pending content arrives without another copy. Repeat a Windows read while another app holds it. Retries run every 50 ms, up to 40 attempts (about two seconds when the event loop is responsive). Separately test a lock beyond that budget: expect a warning and responsive input, then verify a fresh copy works after release. Record lock/delivery times and logs. |
 | Ordinary and high-rate movement | At the usual polling rate, move slowly, diagonally, in small circles and repeatedly across edges for 60 seconds; repeat at an available higher rate. Check endpoints, overshoot, pauses and return behavior. Repeat during large text/image transfer and continuous key input; record measurements or video, without inventing a latency bound. |
 | Buttons, wheels and modifiers | Test left/right/middle and available extra buttons; small vertical wheel increments, reversals and horizontal wheel. Test left/right Shift/Ctrl/Alt/Meta independently, shortcuts, held modifiers across transitions, Chinese input and release on return. Confirm no stuck state or phantom click. |
 | Drag | Drag a window and select text with left button held. Repeat right/middle drags in apps that support them and modifier-assisted drag. Check continuous motion, correct drag button and release at destination, across a screen edge and back. |
@@ -199,9 +199,11 @@ screenshot of an open window does not establish successful paste, release, recon
 | Upgrade and rollback | With the previous Core deliberately left behind in an isolated test, start the reviewed GUI; verify controlled replacement/adoption as appropriate, correct process identity and working sharing. Execute the rollback procedure above, then the update again, preserving settings and pairing. |
 | Mixed DPI and multiple monitors | Test every real screen edge, mixed scale factors, negative coordinates, non-aligned monitors/gaps, corners and quick back-and-forth transitions. Repeat drag and small wheel increments on each display. Verify normal and configured emergency/local return. Record any topology unavailable on the host. |
 
-For the clipboard-busy row, this separate Windows test terminal holds the clipboard for three seconds.
-Arrange for a Mac copy while the message is visible; after release, paste on Windows without a second copy.
-The `finally` block releases the clipboard even if the wait is interrupted.
+For the short clipboard-busy row, this separate Windows test terminal holds the clipboard for one second.
+Coordinate the Mac copy with the helper (using scheduled commands if needed), and confirm delivery actually
+occurred during the lock. After release, paste on Windows without a second copy. The short lock stays within
+the retry budget; a longer lock tests exhaustion instead of guaranteed deferred delivery. The `finally` block
+releases the clipboard even if the wait is interrupted.
 
 ```powershell
 Add-Type @'
@@ -215,7 +217,7 @@ public static class DeskflowClipboardLockTest {
 if (![DeskflowClipboardLockTest]::OpenClipboard([IntPtr]::Zero)) { throw 'Clipboard already busy; retry the helper' }
 try {
     Write-Host 'Clipboard held: copy from the Mac now'
-    Start-Sleep -Seconds 3
+    Start-Sleep -Seconds 1
 } finally {
     [DeskflowClipboardLockTest]::CloseClipboard() | Out-Null
 }
