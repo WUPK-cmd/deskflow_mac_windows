@@ -151,6 +151,7 @@ jobs:
             repository = $env:GITHUB_REPOSITORY
             commit = (git rev-parse HEAD)
             describe = (git describe --tags --always --dirty)
+            trackedChanges = @(git status --porcelain --untracked-files=no)
             target = '${{ matrix.target.name }}'
             qt = $env:QT_VERSION
             openssl = $openssl
@@ -158,6 +159,7 @@ jobs:
             runner = $env:RUNNER_OS
             run = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
           }
+          git diff --stat
           $identity | ConvertTo-Json | Set-Content staging/build-info.json
           Copy-Item staging/build-info.json dist/build-info.json
 
