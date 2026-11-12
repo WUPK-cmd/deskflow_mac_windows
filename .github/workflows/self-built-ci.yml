@@ -143,10 +143,11 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           $openssl = if ($env:RUNNER_OS -eq 'Windows') {
-            (& ./.ci-deps/vcpkg/vcpkg.exe list openssl) -join "`n"
+            (& ./.ci-deps/vcpkg/vcpkg.exe list openssl --classic) -join "`n"
           } else {
             brew list --versions openssl@3
           }
+          if ($LASTEXITCODE -ne 0 -or !$openssl) { throw 'OpenSSL build identity could not be determined' }
           $identity = [ordered]@{
             repository = $env:GITHUB_REPOSITORY
             commit = (git rev-parse HEAD)
