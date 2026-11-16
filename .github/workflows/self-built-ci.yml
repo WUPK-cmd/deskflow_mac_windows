@@ -203,7 +203,8 @@ jobs:
           cpack --config build/CPackConfig.cmake -G DragNDrop -B dist
           dmgs=(dist/*.dmg)
           test "${#dmgs[@]}" -eq 1
-          hdiutil attach "${dmgs[0]}" -readonly -nobrowse -mountpoint "$PWD/package-check/dmg"
+          # The image embeds this project's GPL; acknowledge it for the CI-only read-only mount.
+          hdiutil attach "${dmgs[0]}" -readonly -nobrowse -mountpoint "$PWD/package-check/dmg" <<< 'Y'
           trap 'hdiutil detach "$PWD/package-check/dmg"' EXIT
           python3 .github/scripts/package_identity.py verify-tree --target macos-arm64 --root package-check/dmg --identity build-info.json
           hdiutil detach "$PWD/package-check/dmg"
