@@ -173,6 +173,45 @@ private Q_SLOTS:
     window.close();
   }
 
+  void windowCanShrinkVerticallyWithoutLosingActions_data()
+  {
+    QTest::addColumn<bool>("showLog");
+    QTest::addColumn<double>("fontScale");
+    QTest::newRow("normal-collapsed") << false << 1.0;
+    QTest::newRow("normal-expanded") << true << 1.0;
+    QTest::newRow("large-font-collapsed") << false << 1.4;
+    QTest::newRow("large-font-expanded") << true << 1.4;
+  }
+
+  void windowCanShrinkVerticallyWithoutLosingActions()
+  {
+    QFETCH(bool, showLog);
+    QFETCH(double, fontScale);
+    Settings::setValue(Settings::Core::CoreMode, Settings::CoreMode::Server);
+    Settings::setValue(Settings::Gui::LogExpanded, showLog);
+    MainWindow window("deskflow-resize-" + QUuid::createUuid().toString(QUuid::WithoutBraces));
+    auto font = window.font();
+    font.setPointSizeF(font.pointSizeF() * fontScale);
+    window.setFont(font);
+    window.open();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    window.resize(700, 700);
+    QTest::qWait(50);
+    window.resize(700, 460);
+    QTRY_COMPARE(window.height(), 460);
+    for (const auto name : {"btnMicrophoneSettings", "btnToggleCore"}) {
+      auto button = window.findChild<QPushButton *>(name);
+      QVERIFY(button);
+      QVERIFY(button->isVisible());
+      const auto bounds = QRect(button->mapTo(&window, QPoint()), button->size());
+      QVERIFY2(window.rect().contains(bounds), name);
+    }
+    capture(window, showLog ? "compact-log-expanded.png" : "compact-log-collapsed.png");
+    window.resize(700, 760);
+    QTRY_COMPARE(window.height(), 760);
+    window.close();
+  }
+
 private:
   static void verifyRoleDescriptions(MainWindow &window)
   {

@@ -48,8 +48,10 @@
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QScreen>
+#include <QScrollArea>
 #include <QScrollBar>
 #include <QSignalBlocker>
+#include <QVBoxLayout>
 
 #include <memory>
 
@@ -84,6 +86,25 @@ MainWindow::MainWindow(const QString &guiSocketName)
       m_networkMonitor{new NetworkMonitor(this)}
 {
   ui->setupUi(this);
+
+  // Keep the actions reachable when a small display or expanded log leaves
+  // less room than the setup form needs. The form can scroll independently.
+  auto content = takeCentralWidget();
+  content->layout()->removeWidget(ui->horizontalWidget);
+  auto scroll = new QScrollArea(this);
+  scroll->setObjectName(QStringLiteral("mainContentScroll"));
+  scroll->setFrameShape(QFrame::NoFrame);
+  scroll->setWidgetResizable(true);
+  scroll->setMinimumHeight(160);
+  scroll->setWidget(content);
+  auto central = new QWidget(this);
+  auto layout = new QVBoxLayout(central);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(0);
+  layout->addWidget(scroll);
+  ui->horizontalLayout_6->setContentsMargins(24, 8, 24, 16);
+  layout->addWidget(ui->horizontalWidget);
+  setCentralWidget(central);
 
   setWindowIcon(QIcon::fromTheme(kRevFqdnName));
 
