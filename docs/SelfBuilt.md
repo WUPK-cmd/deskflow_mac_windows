@@ -4,25 +4,33 @@ This fork's source is [WUPK-cmd/deskflow_mac_windows](https://github.com/WUPK-cm
 For day-to-day setup, a direct Ethernet link, clipboard images and microphone routing, see the
 [Chinese Windows/Mac usage guide](WindowsMac-Usage.zh-CN.md).
 The **Self-built Windows and macOS** workflow runs on `main` and `codex/**` pushes, pull requests and manual dispatches.
-It compiles and tests Windows x64 and macOS arm64 with Qt 6.8.3, then uploads runtime ZIPs, SHA-256 checksums,
+It compiles and tests Windows x64 and macOS arm64 with Qt 6.8.3 plus Multimedia and microphone follow enabled,
+then uploads Windows MSI/portable ZIP, macOS DMG/app ZIP, SHA-256 checksums,
 `build-info.json`, and test evidence. Download both host artifacts from the **same workflow run**. On a pull
 request, `build-info.json.commit` identifies the tested merge commit; use that value rather than assuming
 the PR head is the build input. The separate upstream workflow remains unchanged.
 
-These are Actions artifacts, retained for 14 days. This workflow does not create tags, publish Releases,
-sign with a distribution certificate, notarize, or install on either host. Its macOS bundle is ad hoc signed.
+These are Actions artifacts, retained for 14 days. This build workflow does not create tags or publish Releases.
+The separate **Publish reviewed native packages** workflow accepts an exact successful build run ID and full
+source SHA, verifies both native package sets, then creates a draft (default) or explicitly selected prerelease.
+Published assets are retained in this fork's [Releases](https://github.com/WUPK-cmd/deskflow_mac_windows/releases).
+Windows packages are unsigned; macOS bundles are ad hoc signed and not notarized. No workflow installs on the
+user's two hosts. MSI verification uses administrative extraction on the disposable runner; DMGs are mounted
+read-only, checked and detached.
 Intel Macs need a native x86_64 build; the arm64 CI job does not verify Intel compatibility. The version
 checker reads this fork's latest published stable GitHub Release. An empty release channel, API failure or
-404 produces no update notification. CI artifacts do not become Releases automatically. Opening the download
+404 produces no update notification. CI artifacts do not become Releases automatically; prereleases are excluded
+from stable update checks. Opening the download
 entry leads to this fork's Releases page, where there may be no release yet; builds can be obtained from
 [Actions](https://github.com/WUPK-cmd/deskflow_mac_windows/actions/workflows/self-built-ci.yml).
 An explicitly configured `gui/updateCheckUrl` override is retained; review that override if an existing
 installation still checks a different endpoint.
 
 The application and settings identity remains Deskflow, including the `deskflow.org` organization domain.
-Existing settings and TLS pairing must remain usable. The microphone feature keeps its project default
-`BUILD_MICROPHONE_FOLLOW=OFF`; it is outside the acceptance scope below. For a deliberate microphone build,
-install Qt Multimedia and add `-DBUILD_MICROPHONE_FOLLOW=ON` on **both** hosts, then accept that feature separately.
+Existing settings and TLS pairing must remain usable. The source option retains its project default
+`BUILD_MICROPHONE_FOLLOW=OFF`; the fork workflow and recipes below explicitly enable it on **both** hosts.
+Automated tests exercise microphone settings and deployment, not the user's virtual drivers or actual remote
+audio. Accept the real microphone route separately using the Chinese usage guide.
 
 ## Build the same commit on both hosts
 
@@ -53,7 +61,7 @@ $DeskflowDeps = Join-Path (Split-Path -Parent $PWD.Path) 'deskflow-deps'
 New-Item -ItemType Directory -Path $DeskflowDeps -Force | Out-Null
 python -m venv "$DeskflowDeps/aqt"
 & "$DeskflowDeps/aqt/Scripts/python.exe" -m pip install aqtinstall==3.3.0
-& "$DeskflowDeps/aqt/Scripts/python.exe" -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O "$DeskflowDeps/Qt"
+& "$DeskflowDeps/aqt/Scripts/python.exe" -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O "$DeskflowDeps/Qt" -m qtmultimedia
 git clone --branch 2026.10.16 --depth 1 https://github.com/microsoft/vcpkg.git "$DeskflowDeps/vcpkg"
 & "$DeskflowDeps/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
 & "$DeskflowDeps/vcpkg/vcpkg.exe" install openssl:x64-windows-release --classic --disable-metrics
@@ -63,7 +71,7 @@ $DeskflowQt = "$DeskflowDeps/Qt/6.8.3/msvc2022_64"
 $env:PATH = "$DeskflowQt/bin;$DeskflowDeps/vcpkg/installed/x64-windows-release/bin;$env:PATH"
 $env:QT_QPA_PLATFORM = 'offscreen'
 cmake -S . -B build-self-built -G Ninja -DCMAKE_BUILD_TYPE=Release `
-  -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=OFF `
+  -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=OFF -DBUILD_MICROPHONE_FOLLOW=ON `
   -DCMAKE_COMPILE_WARNING_AS_ERROR=ON -DCMAKE_PREFIX_PATH="$DeskflowQt" `
   -DCMAKE_TOOLCHAIN_FILE="$DeskflowDeps/vcpkg/scripts/buildsystems/vcpkg.cmake" `
   -DVCPKG_TARGET_TRIPLET=x64-windows-release -DVCPKG_MANIFEST_MODE=OFF `
@@ -105,12 +113,12 @@ brew install cmake ninja openssl@3
 DeskflowDeps="$(cd .. && pwd)/deskflow-deps"
 python3 -m venv "$DeskflowDeps/aqt"
 "$DeskflowDeps/aqt/bin/python" -m pip install aqtinstall==3.3.0
-"$DeskflowDeps/aqt/bin/python" -m aqt install-qt mac desktop 6.8.3 clang_64 -O "$DeskflowDeps/Qt"
+"$DeskflowDeps/aqt/bin/python" -m aqt install-qt mac desktop 6.8.3 clang_64 -O "$DeskflowDeps/Qt" -m qtmultimedia
 export PATH="$DeskflowDeps/Qt/6.8.3/macos/bin:$PATH"
 DeskflowArch="$(uname -m)"
 case "$DeskflowArch" in arm64|x86_64) ;; *) exit 1 ;; esac
 cmake -S . -B build-self-built -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=OFF \
+  -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=OFF -DBUILD_MICROPHONE_FOLLOW=ON \
   -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
   -DCMAKE_PREFIX_PATH="$DeskflowDeps/Qt/6.8.3/macos" \
   -DCMAKE_OSX_ARCHITECTURES="$DeskflowArch" -DCMAKE_OSX_DEPLOYMENT_TARGET=14 \

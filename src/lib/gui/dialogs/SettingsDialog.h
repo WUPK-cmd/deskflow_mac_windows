@@ -12,6 +12,7 @@
 #include "gui/config/ServerConfig.h"
 
 class SettingsDialogButtonBox;
+class MicrophoneSettingsWidget;
 
 namespace Ui {
 class SettingsDialog;
@@ -23,8 +24,11 @@ class SettingsDialog : public QDialog
 
 public:
   void extracted();
-  SettingsDialog(QWidget *parent, const ServerConfig &serverConfig);
+  SettingsDialog(
+      QWidget *parent, const ServerConfig &serverConfig, MicrophoneSettingsWidget *microphoneSettings = nullptr
+  );
   ~SettingsDialog() override;
+  void showMicrophoneTab();
 
 Q_SIGNALS:
   void requestRemoveAllSettings();
@@ -53,9 +57,6 @@ private:
 
   /// @brief Enables controls when they should be.
   void updateControls();
-
-  /// @brief updates the setting vaule for key size.
-  void updateRequestedKeySize() const;
 
   /// @brief update if the log level warning is shown
   void logLevelChanged();
@@ -87,4 +88,5 @@ private:
   std::unique_ptr<Ui::SettingsDialog> ui;
   const ServerConfig &m_serverConfig;
   SettingsDialogButtonBox *m_buttonBox = nullptr;
+  MicrophoneSettingsWidget *m_microphoneSettings = nullptr;
 };

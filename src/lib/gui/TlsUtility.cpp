@@ -98,14 +98,14 @@ QByteArray certFingerprint(const QString &certPath)
   return cert.digest(QCryptographicHash::Sha256);
 }
 
-bool generateCertificate()
+bool generateCertificate(int requestedKeyLength)
 {
   qDebug(
       "generating tls certificate, "
       "all clients must trust the new fingerprint"
   );
 
-  const auto keyLength = std::max(2048, Settings::value(Settings::Security::KeySize).toInt());
+  const auto keyLength = std::max(2048, requestedKeyLength);
   const auto certPath = Settings::value(Settings::Security::Certificate).toString();
 
   QFileInfo info(certPath);

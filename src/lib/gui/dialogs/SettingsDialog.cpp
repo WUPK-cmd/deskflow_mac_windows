@@ -15,16 +15,22 @@
 #include "common/Settings.h"
 #include "gui/TlsUtility.h"
 #include "gui/core/NetworkMonitor.h"
+#include "gui/widgets/MicrophoneSettingsWidget.h"
 #include "gui/widgets/SettingsDialogButtonBox.h"
 
 #include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QScreen>
+#include <QStyle>
+#include <QTabBar>
 
 using namespace deskflow::gui;
 
-SettingsDialog::SettingsDialog(QWidget *parent, const ServerConfig &serverConfig)
+SettingsDialog::SettingsDialog(
+    QWidget *parent, const ServerConfig &serverConfig, MicrophoneSettingsWidget *microphoneSettings
+)
     : QDialog(parent),
       ui{std::make_unique<Ui::SettingsDialog>()},
       m_serverConfig(serverConfig),
@@ -32,6 +38,8 @@ SettingsDialog::SettingsDialog(QWidget *parent, const ServerConfig &serverConfig
 {
 
   ui->setupUi(this);
+  m_microphoneSettings = microphoneSettings ? microphoneSettings : new MicrophoneSettingsWidget(serverConfig, this);
+  ui->tabWidget->addTab(m_microphoneSettings, tr("&Microphone"));
   layout()->addWidget(m_buttonBox);
   ui->tabWidget->setCurrentIndex(0);
 
@@ -78,11 +86,22 @@ SettingsDialog::SettingsDialog(QWidget *parent, const ServerConfig &serverConfig
 
   adjustSize();
   QApplication::processEvents();
-  setFixedHeight(height());
+  setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+  // Open wide enough to show the tab names at the current font/DPI. Smaller
+  // screens keep Qt's tab scrolling and the dialog can still be resized.
+  const auto margins = layout()->contentsMargins();
+  const auto tabsWidth = ui->tabWidget->tabBar()->sizeHint().width() + margins.left() + margins.right() +
+                         2 * style()->pixelMetric(QStyle::PM_DefaultFrameWidth);
+  resize(qMin(qMax(width(), tabsWidth), screen()->availableGeometry().width() * 9 / 10), height());
   setWindowFlags((windowFlags() | Qt::CustomizeWindowHint) & ~Qt::WindowMinMaxButtonsHint);
 
   setButtonBoxEnabledButtons();
   initConnections();
+}
+
+void SettingsDialog::showMicrophoneTab()
+{
+  ui->tabWidget->setCurrentWidget(m_microphoneSettings);
 }
 
 void SettingsDialog::changeEvent(QEvent *e)
@@ -96,6 +115,7 @@ void SettingsDialog::changeEvent(QEvent *e)
 
 void SettingsDialog::initConnections() const
 {
+  connect(m_microphoneSettings, &MicrophoneSettingsWidget::changed, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(m_buttonBox, &SettingsDialogButtonBox::accepted, this, &SettingsDialog::accept);
   connect(m_buttonBox, &SettingsDialogButtonBox::rejected, this, &QDialog::reject);
   connect(m_buttonBox, &SettingsDialogButtonBox::reset, this, &SettingsDialog::loadFromConfig);
@@ -108,7 +128,6 @@ void SettingsDialog::initConnections() const
   connect(ui->groupService, &QGroupBox::toggled, this, &SettingsDialog::updateControls);
   connect(ui->btnClearAllSettings, &QPushButton::clicked, this, &SettingsDialog::resetAllSettings);
   connect(ui->btnTlsRegenCert, &QPushButton::clicked, this, &SettingsDialog::regenCertificates);
-  connect(ui->comboTlsKeyLength, &QComboBox::currentIndexChanged, this, &SettingsDialog::updateRequestedKeySize);
   connect(ui->btnTlsCertPath, &QPushButton::clicked, this, &SettingsDialog::browseCertificatePath);
   connect(ui->btnBrowseLog, &QPushButton::clicked, this, &SettingsDialog::browseLogPath);
   connect(ui->groupLogToFile, &QGroupBox::toggled, this, &SettingsDialog::setLogToFile);
@@ -146,7 +165,7 @@ void SettingsDialog::initConnections() const
 
 void SettingsDialog::regenCertificates()
 {
-  if (TlsUtility::generateCertificate()) {
+  if (TlsUtility::generateCertificate(ui->comboTlsKeyLength->currentText().toInt())) {
     QMessageBox::information(this, tr("TLS Certificate Regenerated"), tr("TLS certificate regenerated successfully."));
     const auto certificate = Settings::value(Settings::Security::Certificate).toString();
     updateKeyLengthOnFile(certificate);
@@ -199,6 +218,7 @@ void SettingsDialog::resetAllSettings()
 
 void SettingsDialog::updateText()
 {
+  ui->tabWidget->setTabText(ui->tabWidget->indexOf(m_microphoneSettings), tr("&Microphone"));
   const auto logLevels = LogLevel::logLevelNames().count();
   const QStringList toolTips = {tr("Required messages"),        tr("Non-fatal errors"), tr("General warnings"),
                                 tr("General events [Default]"), tr("Debug entries"),    tr("Verbose debug output")};
@@ -219,6 +239,12 @@ void SettingsDialog::updateText()
 
 void SettingsDialog::accept()
 {
+  if (!Settings::isWritable())
+    return;
+  if (!m_microphoneSettings->save(ui->groupSecurity->isChecked(), ui->cbRequireClientCert->isChecked())) {
+    showMicrophoneTab();
+    return;
+  }
   Settings::setValue(Settings::Core::Port, ui->sbPort->value());
   Settings::setValue(Settings::Core::Interface, ui->comboInterface->currentData());
   Settings::setValue(Settings::Log::Level, ui->comboLogLevel->currentData());
@@ -253,6 +279,7 @@ void SettingsDialog::accept()
 
 void SettingsDialog::loadFromConfig()
 {
+  m_microphoneSettings->loadFromConfig();
   ui->sbPort->setValue(Settings::value(Settings::Core::Port).toInt());
   ui->comboLogLevel->setCurrentIndex(
       ui->comboLogLevel->findData(Settings::logLevelText(), Qt::UserRole, Qt::MatchFixedString)
@@ -302,6 +329,7 @@ void SettingsDialog::loadFromConfig()
   qDebug() << "load from config done";
 
   updateControls();
+  setButtonBoxEnabledButtons();
 }
 
 void SettingsDialog::updateTlsControls()
@@ -386,6 +414,7 @@ void SettingsDialog::updateControls()
   ui->cbRunExitCommand->setEnabled(writable);
   ui->lineCommandEnter->setEnabled(writable && ui->cbRunEnterCommand->isChecked());
   ui->lineCommandExit->setEnabled(writable && ui->cbRunExitCommand->isChecked());
+  m_microphoneSettings->setEnabled(writable);
 
   // Portable mode only ever applies to Windows.
   // Daemon options should only be available on Windows when *not* in portable mode.
@@ -398,13 +427,6 @@ void SettingsDialog::updateControls()
   ui->widgetLogFilename->setEnabled(writable && logToFile);
 
   updateTlsControls();
-}
-
-void SettingsDialog::updateRequestedKeySize() const
-{
-  if (ui->comboTlsKeyLength->currentText() == Settings::value(Settings::Security::KeySize).toString())
-    return;
-  Settings::setValue(Settings::Security::KeySize, ui->comboTlsKeyLength->currentText());
 }
 
 void SettingsDialog::logLevelChanged()
@@ -442,7 +464,7 @@ bool SettingsDialog::isModified() const
 
   if (!ignoreInterface)
     modified = modified || ui->comboInterface->currentText() != Settings::value(Settings::Core::Interface).toString();
-  return modified;
+  return modified || m_microphoneSettings->isModified();
 }
 
 bool SettingsDialog::isDefault() const
@@ -473,12 +495,13 @@ bool SettingsDialog::isDefault() const
       (ui->lineCommandExit->text() == Settings::defaultValue(Settings::Core::ComputerExitCommand).toString()) &&
       (ui->cbRunEnterCommand->isChecked() == Settings::defaultValue(Settings::Core::EnableEnterCommand).toBool()) &&
       (ui->cbRunExitCommand->isChecked() == Settings::defaultValue(Settings::Core::EnableExitCommand).toBool()) &&
-      (ui->comboLanguage->currentText() == "English")
+      (ui->comboLanguage->currentText() == "English") && m_microphoneSettings->isDefault()
   );
 }
 
 void SettingsDialog::resetToDefault()
 {
+  m_microphoneSettings->resetToDefault();
   ui->sbPort->setValue(Settings::defaultValue(Settings::Core::Port).toInt());
   ui->comboLogLevel->setCurrentIndex(
       static_cast<int>(LogLevel::fromOption(Settings::defaultValue(Settings::Log::Level).toString()))

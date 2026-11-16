@@ -1,5 +1,7 @@
 Welcome to the Deskflow Help!
 
+本自制版的安装、有线直连、剪贴板和麦克风配置见[中文使用手册](WindowsMac-Usage.zh-CN.md)。
+
 ## Introduction
 * [Homepage](https://deskflow.org) - Project home page
 * [Code](https://github.com/deskflow/deskflow) - Read the code

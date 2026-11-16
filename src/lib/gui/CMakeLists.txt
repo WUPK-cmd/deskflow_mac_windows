@@ -101,6 +101,8 @@ add_library(${target} STATIC
   widgets/FingerprintPreview.h
   widgets/KeySequenceWidget.cpp
   widgets/KeySequenceWidget.h
+  widgets/MicrophoneSettingsWidget.cpp
+  widgets/MicrophoneSettingsWidget.h
   widgets/LogDock.cpp
   widgets/LogDock.h
   widgets/LogWidget.h
@@ -124,3 +126,8 @@ target_link_libraries(${target}
     net
     Qt6::Widgets
 )
+
+if(BUILD_MICROPHONE_FOLLOW)
+  target_compile_definitions(${target} PRIVATE DESKFLOW_MICROPHONE_GUI)
+  target_link_libraries(${target} PUBLIC Qt6::Multimedia)
+endif()

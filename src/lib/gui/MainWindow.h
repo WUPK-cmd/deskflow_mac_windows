@@ -59,7 +59,7 @@ public:
   };
 
 public:
-  explicit MainWindow();
+  explicit MainWindow(const QString &guiSocketName = QStringLiteral("deskflow-gui"));
   ~MainWindow() override;
 
   [[nodiscard]] CoreMode coreMode() const
@@ -79,6 +79,9 @@ protected:
   bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
+  friend class MainWindowPresentationTests;
+  static QPair<QString, QString>
+  connectionStatusText(CoreMode mode, ProcessState process, ConnectionState connection, const QString &remoteHost);
   /**
    * @brief updateText Update all text not in the UI
    */
@@ -98,6 +101,7 @@ private:
   void openAboutDialog();
   void openGetNewVersionUrl() const;
   void openSettings();
+  void openSettingsDialog(bool microphoneTab);
   void startCore();
   void stopCore();
   bool saveServerConfig();
@@ -132,6 +136,7 @@ private:
   void showConfigureClient();
   void restoreWindow();
   void setupControls();
+  void updateDescriptionMinimumHeights();
   void showFirstConnectedMessage();
   void updateStatus();
   void showAndActivate();
@@ -163,7 +168,6 @@ private:
 
   void serverClientsChanged(const QStringList &clients);
 
-  inline static const auto m_guiSocketName = QStringLiteral("deskflow-gui");
   inline static const auto m_nameRegEx = QRegularExpression(QStringLiteral("^[\\w\\-_\\.]{0,255}$"));
 
   VersionChecker m_versionChecker;

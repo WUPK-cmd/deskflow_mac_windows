@@ -59,7 +59,7 @@
 
 using namespace deskflow::gui;
 
-MainWindow::MainWindow()
+MainWindow::MainWindow(const QString &guiSocketName)
     : ui{std::make_unique<Ui::MainWindow>()},
       m_coreProcess(m_serverConfig),
       m_trayIcon{new QSystemTrayIcon(this)},
@@ -127,8 +127,8 @@ MainWindow::MainWindow()
 
   // Setup the Instance Checking
   // In case of a previous crash remove first
-  QLocalServer::removeServer(m_guiSocketName);
-  m_guiDupeChecker->listen(m_guiSocketName);
+  QLocalServer::removeServer(guiSocketName);
+  m_guiDupeChecker->listen(guiSocketName);
 
   createMenuBar();
   setupControls();
@@ -192,14 +192,28 @@ void MainWindow::restoreWindow()
     QRect screenGeometry = QGuiApplication::primaryScreen()->geometry();
     move(screenGeometry.center() - rect().center());
   }
-
-  if (!Settings::value(Settings::Gui::LogExpanded).toBool())
-    setFixedSize(size());
 }
 
 void MainWindow::setupControls()
 {
   secureSocket(false);
+
+  auto titleFont = font();
+  titleFont.setPointSizeF(titleFont.pointSizeF() * 1.7);
+  titleFont.setBold(true);
+  ui->lblAppTitle->setFont(titleFont);
+  auto statusFont = font();
+  statusFont.setPointSizeF(statusFont.pointSizeF() * 1.2);
+  statusFont.setBold(true);
+  ui->lblConnectionTitle->setFont(statusFont);
+  ui->connectionPanel->setAutoFillBackground(true);
+  ui->connectionPanel->setBackgroundRole(QPalette::Base);
+  ui->btnMicrophoneSettings->setIcon(QIcon::fromTheme(QStringLiteral("audio-input-microphone")));
+  ui->cbHostname->lineEdit()->setPlaceholderText(tr("Computer name or IP address"));
+  for (const auto description : {ui->lblServerDescription, ui->lblClientDescription}) {
+    description->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    description->installEventFilter(this);
+  }
 
   ui->btnConfigureServer->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
   ui->btnConfigureClient->setIcon(QIcon::fromTheme(QStringLiteral("configure")));
@@ -265,6 +279,7 @@ void MainWindow::connectSlots()
   connect(m_actionTrayQuit, &QAction::triggered, this, &MainWindow::close);
   connect(m_actionRestore, &QAction::triggered, this, &MainWindow::showAndActivate);
   connect(m_actionSettings, &QAction::triggered, this, &MainWindow::openSettings);
+  connect(ui->btnMicrophoneSettings, &QPushButton::clicked, this, [this] { openSettingsDialog(true); });
   connect(m_actionStartCore, &QAction::triggered, this, &MainWindow::startCore);
   connect(m_actionRestartCore, &QAction::triggered, this, &MainWindow::resetCore);
   connect(m_actionStopCore, &QAction::triggered, this, &MainWindow::stopCore);
@@ -320,12 +335,10 @@ void MainWindow::toggleLogVisible(bool visible)
     return;
   }
 
-  setFixedSize(16777215, 16777215);
   Settings::setValue(Settings::Gui::LogExpanded, visible);
   if (visible) {
     if (m_logDock->isFloating()) {
       adjustSize();
-      setFixedSize(size());
     } else {
       QTimer::singleShot(15, this, [&] { resize(m_expandedSize); });
     }
@@ -337,7 +350,6 @@ void MainWindow::toggleLogVisible(bool visible)
     if (!m_logDock->isFloating()) {
       adjustSize();
     }
-    setFixedSize(size());
   }
   Settings::setValue(Settings::Gui::WindowGeometry, geometry());
 }
@@ -478,7 +490,14 @@ void MainWindow::openGetNewVersionUrl() const
 
 void MainWindow::openSettings()
 {
+  openSettingsDialog(false);
+}
+
+void MainWindow::openSettingsDialog(bool microphoneTab)
+{
   auto dialog = SettingsDialog(this, m_serverConfig);
+  if (microphoneTab)
+    dialog.showMicrophoneTab();
 
   connect(&dialog, &SettingsDialog::requestRemoveAllSettings, this, &MainWindow::clearSettings, Qt::UniqueConnection);
   if (dialog.exec() == QDialog::Accepted) {
@@ -557,12 +576,15 @@ void MainWindow::updateModeControls()
 
   if (isServer || isClient)
     updateModeControlLabels();
+  updateStatus();
 }
 
 void MainWindow::updateModeControlLabels()
 {
   const bool isServer = m_coreProcess.mode() == CoreMode::Server;
-  const bool isStarted = m_coreProcess.isStarted();
+  const auto state = m_coreProcess.processState();
+  const bool isStarted =
+      state == ProcessState::Started || state == ProcessState::Starting || state == ProcessState::RetryPending;
 
   QString startText;
   QString stopText;
@@ -570,13 +592,13 @@ void MainWindow::updateModeControlLabels()
   QIcon stopIcon;
 
   if (isServer) {
-    startText = tr("Start");
-    stopText = tr("Stop");
+    startText = tr("&Start");
+    stopText = tr("S&top");
     startIcon = QIcon::fromTheme(QStringLiteral("system-run"));
     stopIcon = QIcon::fromTheme(QIcon::ThemeIcon::ProcessStop);
   } else {
-    startText = tr("Connect");
-    stopText = tr("Disconnect");
+    startText = tr("&Connect");
+    stopText = tr("&Disconnect");
     startIcon = QIcon::fromTheme(QStringLiteral("network-connect"));
     stopIcon = QIcon::fromTheme(QStringLiteral("network-disconnect"));
   }
@@ -955,6 +977,78 @@ void MainWindow::updateStatus()
     ui->btnEditName->setVisible(process == Stopped);
   }
   m_statusBar->setStatus(connection, process, isServer);
+  const auto [title, detail] =
+      connectionStatusText(m_coreProcess.mode(), process, connection, ui->cbHostname->currentText());
+  ui->lblConnectionTitle->setText(title);
+  ui->lblConnectionDetail->setText(detail);
+}
+
+QPair<QString, QString> MainWindow::connectionStatusText(
+    CoreMode mode, ProcessState process, ConnectionState connection, const QString &remoteHost
+)
+{
+  if (mode == CoreMode::None) {
+    return {tr("Ready to set up"), tr("Choose where your keyboard and mouse come from to get started.")};
+  }
+
+  const bool isServer = mode == CoreMode::Server;
+  switch (process) {
+  case ProcessState::Stopped:
+    if (isServer) {
+      return {tr("Ready to share"), tr("Arrange your computers, then select Start to share this keyboard and mouse.")};
+    }
+    if (remoteHost.isEmpty()) {
+      return {tr("Not connected"), tr("Enter the server computer's name or IP address, then select Connect.")};
+    }
+    return {tr("Not connected"), tr("Select Connect to use the keyboard and mouse from %1.").arg(remoteHost)};
+
+  case ProcessState::Starting:
+    return {tr("Starting…"), tr("Deskflow is starting. Connection status will appear here in a moment.")};
+
+  case ProcessState::Stopping:
+    return {tr("Stopping…"), tr("Ending keyboard and mouse sharing. Please wait a moment.")};
+
+  case ProcessState::RetryPending:
+    return {
+        tr("Waiting to retry"),
+        isServer ? tr("Check your network and server configuration. Deskflow will try again automatically.")
+                 : tr("Check the server address and network. Deskflow will try again automatically.")
+    };
+
+  case ProcessState::Started:
+    break;
+  }
+
+  switch (connection) {
+  case ConnectionState::Connected:
+    return {
+        tr("Connected"), isServer ? tr("Your keyboard and mouse can control the connected computers.")
+                                  : tr("This computer is using the keyboard and mouse from %1.").arg(remoteHost)
+    };
+
+  case ConnectionState::Listening:
+    if (isServer) {
+      return {
+          tr("Waiting for computers"),
+          tr("On the other computer, choose Receive and enter this computer's name or IP address.")
+      };
+    }
+    return {tr("Waiting for server"), tr("Check that the other computer is running Deskflow in Send mode.")};
+
+  case ConnectionState::Connecting:
+    return {
+        tr("Connecting…"),
+        tr("Check that %1 is running Deskflow in Send mode and is reachable on your network.").arg(remoteHost)
+    };
+
+  case ConnectionState::Disconnected:
+    return {
+        tr("No computers connected"),
+        isServer ? tr("Check your network and the computer arrangement. Other computers must use Receive mode.")
+                 : tr("Check the server address, network and certificate prompts on both computers.")
+    };
+  }
+  return {};
 }
 
 void MainWindow::coreProcessStateChanged(ProcessState state)
@@ -1057,6 +1151,7 @@ void MainWindow::changeEvent(QEvent *e)
     setTrayIcon();
   } else if (e->type() == QEvent::LanguageChange) {
     ui->retranslateUi(this);
+    updateDescriptionMinimumHeights();
     updateModeControlLabels();
     updateNetworkInfo();
     updateStatus();
@@ -1067,6 +1162,14 @@ void MainWindow::changeEvent(QEvent *e)
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
+  if (obj == ui->lblServerDescription || obj == ui->lblClientDescription) {
+    if (event->type() == QEvent::Resize) {
+      updateDescriptionMinimumHeights();
+    } else if (event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange) {
+      QTimer::singleShot(0, this, &MainWindow::updateDescriptionMinimumHeights);
+    }
+    return false;
+  }
   if (obj != ui->lineEditName || event->type() != QEvent::KeyPress)
     return false;
   if (const auto keyEvent = static_cast<QKeyEvent *>(event); keyEvent->key() != Qt::Key_Escape)
@@ -1077,6 +1180,15 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   ui->lineEditName->setText(Settings::value(Settings::Core::ComputerName).toString());
   toggleCanRunCore(canRunCore());
   return true;
+}
+
+void MainWindow::updateDescriptionMinimumHeights()
+{
+  // The dock layout can shrink nested wrapped labels to their one-line minimum.
+  // Propagate the required height at the actual width, font and display scale.
+  for (const auto description : {ui->lblServerDescription, ui->lblClientDescription}) {
+    description->setMinimumHeight(description->heightForWidth(description->width()));
+  }
 }
 
 void MainWindow::updateText()
@@ -1268,6 +1380,7 @@ void MainWindow::remoteHostChanged(const QString &newRemoteHost)
   } else {
     Settings::setValue(Settings::Client::RemoteHost, newRemoteHost);
   }
+  updateStatus();
 }
 
 void MainWindow::updateIpLabel(const QStringList &addresses)

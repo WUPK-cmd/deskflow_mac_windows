@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
+# SPDX-License-Identifier: MIT
+name: Publish reviewed native packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Self-built Windows and macOS run ID to review
+        required: true
+        type: string
+      source_commit:
+        description: Exact full 40-character source commit from that run
+        required: true
+        type: string
+      tag:
+        description: New release tag (for example v1.27.0-microphone.1)
+        required: true
+        type: string
+      publication:
+        description: Create a reviewable draft or publish a prerelease
+        required: true
+        default: draft
+        type: choice
+        options: [draft, prerelease]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: reviewed-native-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'WUPK-cmd/deskflow_mac_windows' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: WUPK-cmd/deskflow_mac_windows
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      PUBLICATION: ${{ inputs.publication }}
+    steps:
+      - name: Checkout trusted release verifier
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify the exact successful run and both native package sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9][A-Za-z0-9._-]*$ ]]
+          # Existing tags/releases are immutable in this workflow.
+          if gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo 'Tag already exists; use a new reviewed release tag' >&2
+            exit 1
+          fi
+          python3 .github/scripts/reviewed_release.py --run-id "$BUILD_RUN_ID" --commit "$SOURCE_COMMIT" --output release-assets
+
+      - name: Create the explicitly selected release
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$PUBLICATION" in
+            draft) flag=--draft ;;
+            prerelease) flag=--prerelease ;;
+            *) exit 1 ;;
+          esac
+          # Atomically reserve the new tag at the verified commit, then require it.
+          gh api --method POST "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$SOURCE_COMMIT"
+          gh release create "$RELEASE_TAG" --verify-tag --target "$SOURCE_COMMIT" "$flag" --latest=false \
+            --title "Deskflow microphone packages $RELEASE_TAG" --notes-file release-notes.md release-assets/*

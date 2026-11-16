@@ -18,6 +18,16 @@ set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt)
 
 set(CPACK_PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
 
+# Install public source/build identity into every CPack install tree and app.
+set(DESKFLOW_BUILD_INFO_FILE "" CACHE FILEPATH "Public build-info.json to include in packages")
+if(DESKFLOW_BUILD_INFO_FILE)
+  if(NOT EXISTS "${DESKFLOW_BUILD_INFO_FILE}")
+    message(FATAL_ERROR "Build identity file is missing: ${DESKFLOW_BUILD_INFO_FILE}")
+  endif()
+  install(FILES "${DESKFLOW_BUILD_INFO_FILE}"
+    DESTINATION ${CMAKE_INSTALL_LICENSE_DIR} RENAME build-info.json)
+endif()
+
 #Prevent this override from being written in the package
 if(NOT PACKAGE_VERSION_LABEL)
     set (PACKAGE_VERSION_LABEL "${CPACK_PACKAGE_VERSION}")

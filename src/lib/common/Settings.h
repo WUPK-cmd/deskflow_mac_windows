@@ -358,6 +358,7 @@ private:
   inline static const QStringList m_defaultFalseValues = {
       Gui::Autohide
     , Gui::AutoStartCore
+    , Gui::LogExpanded
     , Gui::ShownFirstConnectedMessage
     , Gui::ShownServerFirstStartMessage
     , Gui::ShowVersionInTitle
@@ -387,7 +388,6 @@ private:
       Core::UseHooks
     , Gui::CloseToTray
     , Gui::CloseReminder
-    , Gui::LogExpanded
     , Gui::SymbolicTrayIcon
     , Security::TlsEnabled
     , Security::CheckPeers

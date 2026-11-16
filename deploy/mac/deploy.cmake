@@ -12,16 +12,21 @@ if (OSX_BUNDLE)
   set(_codesign_identity "-")
   if (APPLE_CODESIGN_DEV)
     set(_codesign_identity "${APPLE_CODESIGN_DEV}")
+    set(_signing_arguments "-hardened-runtime -timestamp")
   endif()
   if (BUILD_MICROPHONE_FOLLOW)
     set(_core_deploy_argument "\"-executable=\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/${CMAKE_PROJECT_NAME}-core\"")
   endif()
   install(CODE "execute_process(COMMAND
-    ${DEPLOYQT}
+    \"${DEPLOYQT}\"
     \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_PROPER_NAME}.app\"
     ${_core_deploy_argument}
-    -hardened-runtime -timestamp \"-codesign=${_codesign_identity}\"
-  )")
+    ${_signing_arguments} \"-codesign=${_codesign_identity}\"
+    RESULT_VARIABLE _deploy_result
+  )
+  if(NOT _deploy_result EQUAL 0)
+    message(FATAL_ERROR \"macdeployqt failed: \${_deploy_result}\")
+  endif()")
   set(CPACK_PACKAGE_ICON "${MY_DIR}/dmg-volume.icns")
   set(CPACK_DMG_BACKGROUND_IMAGE "${MY_DIR}/dmg-background.tiff")
   set(CPACK_DMG_DS_STORE_SETUP_SCRIPT "${MY_DIR}/generate_ds_store.applescript")

@@ -19,6 +19,7 @@ concurrency:
 env:
   QT_VERSION: '6.8.3'
   QT_QPA_PLATFORM: offscreen
+  DOTNET_ROLL_FORWARD: Major
 
 jobs:
   build:
@@ -54,8 +55,9 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           arch: ${{ matrix.target.qt-arch }}
+          modules: qtmultimedia
           cache: true
-          cache-key-prefix: self-built-${{ matrix.target.name }}-${{ env.QT_VERSION }}
+          cache-key-prefix: self-built-multimedia-${{ matrix.target.name }}-${{ env.QT_VERSION }}
 
       - name: Checkout fixed Windows dependency registry
         if: runner.os == 'Windows'
@@ -81,12 +83,47 @@ jobs:
         shell: bash
         run: brew install openssl@3
 
+      # WiX 4 is the CPack-supported toolchain; pin tool and all extensions together.
+      - name: Install Windows packaging tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 4.0.6
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($extension in 'UI', 'Util', 'Firewall') {
+            wix extension add --global "WixToolset.$extension.wixext/4.0.6"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Record public build identity
+        shell: pwsh
+        run: |
+          $openssl = if ($env:RUNNER_OS -eq 'Windows') {
+            (& ./.ci-deps/vcpkg/vcpkg.exe list openssl --classic) -join "`n"
+          } else {
+            brew list --versions openssl@3
+          }
+          if ($LASTEXITCODE -ne 0 -or !$openssl) { throw 'OpenSSL identity unavailable' }
+          $python = if ($env:RUNNER_OS -eq 'Windows') { 'python' } else { 'python3' }
+          & $python .github/scripts/package_identity.py record --target '${{ matrix.target.name }}' `
+            --openssl "$openssl" --output "$env:GITHUB_WORKSPACE/build-info.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test artifact verification boundaries
+        shell: pwsh
+        run: |
+          $python = if ($env:RUNNER_OS -eq 'Windows') { 'python' } else { 'python3' }
+          & $python .github/scripts/test_package_verification.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Configure Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
-            -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=OFF `
+            -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=ON -DBUILD_MICROPHONE_FOLLOW=ON `
+            -DDESKFLOW_BUILD_INFO_FILE="$env:GITHUB_WORKSPACE/build-info.json" `
+            -DPACKAGE_VERSION_LABEL='${{ github.sha }}' `
             -DCMAKE_COMPILE_WARNING_AS_ERROR=ON `
             -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/.ci-deps/vcpkg/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-release -DVCPKG_MANIFEST_MODE=OFF `
@@ -97,91 +134,88 @@ jobs:
         shell: bash
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=OFF \
+            -DBUILD_TESTS=ON -DSKIP_BUILD_TESTS=ON -DBUILD_INSTALLER=ON -DBUILD_MICROPHONE_FOLLOW=ON \
+            -DDESKFLOW_BUILD_INFO_FILE="$PWD/build-info.json" \
+            -DPACKAGE_VERSION_LABEL='${{ github.sha }}' \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
             -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14 \
             -DOPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
 
-      # BUILD_MICROPHONE_FOLLOW retains the project's default OFF. It can be
-      # built separately with Qt Multimedia when that optional feature is needed.
+      - name: Verify microphone build configuration
+        shell: pwsh
+        run: |
+          $python = if ($env:RUNNER_OS -eq 'Windows') { 'python' } else { 'python3' }
+          & $python .github/scripts/package_identity.py verify-config --cache build/CMakeCache.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build
         run: cmake --build build --parallel 4
 
       - name: Test
         run: ctest --test-dir build --output-on-failure --parallel 2 --timeout 120 --output-junit "${{ github.workspace }}/build/test-results.xml"
 
-      - name: Stage Windows runtime and smoke test
+      - name: Package and verify Windows runtime
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake --install build --prefix staging
+          $ErrorActionPreference = 'Stop'
+          cmake --install build --prefix "$env:GITHUB_WORKSPACE/staging"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $runtimeDirs = @(Get-ChildItem -Path "$env:VCToolsRedistDir/x64/Microsoft.VC*.CRT" -Directory)
           if ($runtimeDirs.Count -eq 0) { throw 'MSVC runtime directory not found' }
           foreach ($runtimeDir in $runtimeDirs) {
             Copy-Item -Path "$($runtimeDir.FullName)/*.dll" -Destination staging
           }
-          $env:PATH = "$env:GITHUB_WORKSPACE/staging;$env:SystemRoot/System32;$env:SystemRoot"
-          & ./staging/deskflow-core.exe --version
+          python .github/scripts/package_identity.py verify-tree --target windows-x64 --root staging --identity build-info.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $gui = Start-Process -FilePath "$env:GITHUB_WORKSPACE/staging/deskflow.exe" -ArgumentList '--version' -Wait -PassThru -WindowStyle Hidden
-          if ($gui.ExitCode -ne 0) { throw "GUI smoke test failed: $($gui.ExitCode)" }
+          cpack --config build/CPackConfig.cmake -G ZIP -B dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cpack --config build/CPackConfig.cmake -G WIX -B dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $zips = @(Get-ChildItem dist/*.zip)
+          $msis = @(Get-ChildItem dist/*.msi)
+          if ($zips.Count -ne 1 -or $msis.Count -ne 1) { throw 'Expected exactly one ZIP and MSI' }
+          Expand-Archive -LiteralPath $zips[0].FullName -DestinationPath package-check/portable
+          python .github/scripts/package_identity.py verify-tree --target windows-x64 --root package-check/portable --identity build-info.json --portable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # Administrative extraction on the disposable runner; no service/product installation.
+          $msiRoot = "$env:GITHUB_WORKSPACE/package-check/msi"
+          New-Item -ItemType Directory -Path $msiRoot -Force | Out-Null
+          $extract = Start-Process msiexec.exe -ArgumentList @('/a', "`"$($msis[0].FullName)`"", '/qn', "TARGETDIR=`"$msiRoot`"", '/L*v', "`"$env:GITHUB_WORKSPACE/build/msi-extraction.log`"") -PassThru -Wait -WindowStyle Hidden
+          if ($extract.ExitCode -ne 0) { throw "MSI extraction failed: $($extract.ExitCode)" }
+          python .github/scripts/package_identity.py verify-tree --target windows-x64 --root $msiRoot --identity build-info.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item build-info.json dist/build-info.json
 
-      - name: Stage macOS runtime and smoke test
+      - name: Package and verify macOS runtime
         if: runner.os == 'macOS'
         shell: bash
         run: |
+          set -euo pipefail
           cmake --install build --prefix "$PWD/staging"
-          macdeployqt "$PWD/staging/Deskflow.app" \
-            "-executable=$PWD/staging/Deskflow.app/Contents/MacOS/deskflow-core" -codesign=-
-          codesign --verify --deep --strict staging/Deskflow.app
-          env -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH staging/Deskflow.app/Contents/MacOS/deskflow-core --version
-          env -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH staging/Deskflow.app/Contents/MacOS/Deskflow --version
+          python3 .github/scripts/package_identity.py verify-tree --target macos-arm64 --root staging --identity build-info.json
+          mkdir -p dist package-check/zip package-check/dmg
+          ditto -c -k --sequesterRsrc --keepParent staging/Deskflow.app "dist/deskflow-${GITHUB_SHA}-macos-arm64.zip"
+          ditto -x -k "dist/deskflow-${GITHUB_SHA}-macos-arm64.zip" package-check/zip
+          python3 .github/scripts/package_identity.py verify-tree --target macos-arm64 --root package-check/zip --identity build-info.json
+          cpack --config build/CPackConfig.cmake -G DragNDrop -B dist
+          dmgs=(dist/*.dmg)
+          test "${#dmgs[@]}" -eq 1
+          hdiutil attach "${dmgs[0]}" -readonly -nobrowse -mountpoint "$PWD/package-check/dmg"
+          trap 'hdiutil detach "$PWD/package-check/dmg"' EXIT
+          python3 .github/scripts/package_identity.py verify-tree --target macos-arm64 --root package-check/dmg --identity build-info.json
+          hdiutil detach "$PWD/package-check/dmg"
+          trap - EXIT
+          cp build-info.json dist/build-info.json
 
-      - name: Record artifact identity
+      - name: Hash every public package asset
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          $openssl = if ($env:RUNNER_OS -eq 'Windows') {
-            (& ./.ci-deps/vcpkg/vcpkg.exe list openssl --classic) -join "`n"
-          } else {
-            brew list --versions openssl@3
-          }
-          if ($LASTEXITCODE -ne 0 -or !$openssl) { throw 'OpenSSL build identity could not be determined' }
-          $identity = [ordered]@{
-            repository = $env:GITHUB_REPOSITORY
-            commit = (git rev-parse HEAD)
-            describe = (git describe --tags --always --dirty)
-            trackedChanges = @(git status --porcelain --untracked-files=no)
-            target = '${{ matrix.target.name }}'
-            qt = $env:QT_VERSION
-            openssl = $openssl
-            microphoneFollow = $false
-            runner = $env:RUNNER_OS
-            run = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
-          }
-          git diff --stat
-          $identity | ConvertTo-Json | Set-Content staging/build-info.json
-          Copy-Item staging/build-info.json dist/build-info.json
-
-      - name: Archive Windows runtime
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Compress-Archive -Path staging/* -DestinationPath "dist/deskflow-${{ matrix.target.name }}-${{ github.sha }}.zip"
-
-      - name: Archive macOS runtime preserving bundle permissions
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          ditto -c -k --sequesterRsrc --keepParent staging/Deskflow.app "dist/deskflow-${{ matrix.target.name }}-${{ github.sha }}.zip"
-
-      - name: Hash runtime archive
-        shell: pwsh
-        run: |
-          Get-ChildItem dist/*.zip | ForEach-Object {
-            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
-            "$hash  $($_.Name)" | Add-Content dist/SHA256SUMS.txt
-          }
+          # CPack also writes working directories and debug symbol files; publish only reviewed assets.
+          Get-ChildItem dist -File | Where-Object { $_.Extension -notin '.zip', '.msi', '.dmg', '.json' } | Remove-Item
+          $python = if ($env:RUNNER_OS -eq 'Windows') { 'python' } else { 'python3' }
+          & $python .github/scripts/package_identity.py manifest --root dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload test evidence
         if: always()
@@ -191,13 +225,19 @@ jobs:
           path: |
             build/test-results.xml
             build/Testing/Temporary/LastTest.log
+            build/msi-extraction.log
           retention-days: 14
           if-no-files-found: warn
 
-      - name: Upload runtime archive
+      - name: Upload verified native packages
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: self-built-${{ matrix.target.name }}-${{ github.sha }}
-          path: dist/*
+          path: |
+            dist/*.zip
+            dist/*.msi
+            dist/*.dmg
+            dist/build-info.json
+            dist/SHA256SUMS.txt
           retention-days: 14
           if-no-files-found: error

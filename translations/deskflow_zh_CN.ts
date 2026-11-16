@@ -488,11 +488,11 @@ Do you want to connect to the server?
     <name>MainWindow</name>
     <message>
         <source>This computer&apos;s name:</source>
-        <translation>此计算机名称：</translation>
+        <translation type="vanished">此计算机名称：</translation>
     </message>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Name can&apos;t have have spaces or special characters&lt;/p&gt;&lt;p&gt;Use Enter to save the name change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;名称不能包含空格或特殊字符&lt;/p&gt;&lt;p&gt;按 Enter 键保存更改。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation type="vanished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;名称不能包含空格或特殊字符&lt;/p&gt;&lt;p&gt;按 Enter 键保存更改。&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Edit Computer Name</source>
@@ -501,18 +501,18 @@ Do you want to connect to the server?
     <message>
         <source>Use this computer&apos;s keyboard and mouse
 (make this computer the server)</source>
-        <translation>使用此计算机的键盘和鼠标
+        <translation type="vanished">使用此计算机的键盘和鼠标
 (将此计算机设为服务器)</translation>
     </message>
     <message>
         <source>Use another computer’s mouse and keyboard
 (make this computer the client)</source>
-        <translation>使用另一台计算机的鼠标和键盘
+        <translation type="vanished">使用另一台计算机的鼠标和键盘
 (将此计算机设为客户端)</translation>
     </message>
     <message>
         <source>&amp;Configure Server</source>
-        <translation>配置服务器(&amp;C)</translation>
+        <translation type="vanished">配置服务器(&amp;C)</translation>
     </message>
     <message>
         <source>Export server configuration</source>
@@ -520,11 +520,11 @@ Do you want to connect to the server?
     </message>
     <message>
         <source>You must select a mode</source>
-        <translation>您必须选择一种模式</translation>
+        <translation type="vanished">您必须选择一种模式</translation>
     </message>
     <message>
         <source>&amp;Start</source>
-        <translation>启动(&amp;S)</translation>
+        <translation>启动共享(&amp;S)</translation>
     </message>
     <message>
         <source>Restart</source>
@@ -536,7 +536,7 @@ Do you want to connect to the server?
     </message>
     <message>
         <source>invalid certificate, generating a new one</source>
-        <translation type="unfinished">证书无效，正在生成新证书</translation>
+        <translation>证书无效，正在生成新证书</translation>
     </message>
     <message>
         <source>Address missing</source>
@@ -560,19 +560,19 @@ Do you want to connect to the server?
     </message>
     <message>
         <source>Start</source>
-        <translation>启动</translation>
+        <translation type="vanished">启动</translation>
     </message>
     <message>
         <source>Stop</source>
-        <translation>停止</translation>
+        <translation type="vanished">停止</translation>
     </message>
     <message>
         <source>Connect</source>
-        <translation>连接</translation>
+        <translation type="vanished">连接</translation>
     </message>
     <message>
         <source>Disconnect</source>
-        <translation>断开</translation>
+        <translation type="vanished">断开</translation>
     </message>
     <message>
         <source>&lt;p&gt;Failed to connect to the server &apos;%1&apos;.&lt;/p&gt;&lt;p&gt;A Client with your name is already connected to the server.&lt;/p&gt;Please ensure that you&apos;re using a unique name and that only a single instance of the client process is running.&lt;/p&gt;</source>
@@ -580,15 +580,15 @@ Do you want to connect to the server?
     </message>
     <message>
         <source>View &amp;Help</source>
-        <translation type="unfinished">查看帮助(&amp;H)</translation>
+        <translation>查看帮助(&amp;H)</translation>
     </message>
     <message>
         <source>Invalid Computer Name</source>
-        <translation type="unfinished"></translation>
+        <translation>电脑名称无效</translation>
     </message>
     <message>
         <source>Computer name already exists</source>
-        <translation type="unfinished"></translation>
+        <translation>电脑名称已存在</translation>
     </message>
     <message>
         <source>No IP Detected</source>
@@ -600,7 +600,7 @@ Do you want to connect to the server?
     </message>
     <message>
         <source>Using IP: </source>
-        <translation type="unfinished">使用IP地址： </translation>
+        <translation>使用地址：</translation>
     </message>
     <message>
         <source>&lt;p&gt;If connecting via the hostname fails, try %1&lt;/p&gt;</source>
@@ -617,8 +617,8 @@ Do you want to connect to the server?
     <message>
         <source>
 A bound IP is now invalid, you may need to restart the server.</source>
-        <translation type="unfinished">
-绑定的IP地址现在无效，您可能需要重启服务器。</translation>
+        <translation>
+之前绑定的 IP 地址已不可用，可能需要重新启动服务器。</translation>
     </message>
     <message>
         <source>&amp;File</source>
@@ -701,51 +701,390 @@ Valid names:
     </message>
     <message>
         <source>Suggested IP: </source>
-        <translation type="unfinished">建议 IP： </translation>
+        <translation>可连接地址：</translation>
     </message>
     <message>
         <source>&amp;Configure Client</source>
-        <translation type="unfinished">配置客户端(&amp;C)</translation>
+        <translation type="obsolete">配置客户端(&amp;C)</translation>
     </message>
     <message>
         <source>Connect to:</source>
-        <translation type="unfinished">连接到：</translation>
+        <translation type="obsolete">连接到：</translation>
     </message>
     <message>
         <source>&lt;html&gt;Hostname or IP address of the server computer.&lt;br/&gt;May contain a comma seperated list.&lt;/html&gt;</source>
-        <translation type="unfinished">&lt;html&gt;服务器计算机的主机名或 IP 地址。&lt;br/&gt;可以包含以逗号分隔的列表。&lt;/html&gt;</translation>
+        <translation type="obsolete">&lt;html&gt;服务器计算机的主机名或 IP 地址。&lt;br/&gt;可以包含以逗号分隔的列表。&lt;/html&gt;</translation>
     </message>
     <message>
         <source>read</source>
-        <translation type="unfinished">读取</translation>
+        <translation>读取</translation>
     </message>
     <message>
         <source>read and write</source>
-        <translation type="unfinished">读取和写入</translation>
+        <translation>读取和写入</translation>
     </message>
     <message>
         <source>The Core executable could not be started.
 Please check if you have sufficient permissions to run %1.</source>
-        <translation type="unfinished">无法启动Core可执行文件。
-请检查您是否有足够的权限来运行%1。</translation>
+        <translation>无法启动共享服务。
+请检查是否具有运行 %1 的权限。</translation>
     </message>
     <message>
         <source>
 Additionally, check you are able to %1 the server config file: %2</source>
-        <translation type="unfinished">
-另外，请检查您是否能够%1服务器配置文件：%2</translation>
+        <translation>
+还请检查是否可以%1服务器配置文件：%2</translation>
     </message>
     <message>
         <source>Don&apos;t show this again</source>
-        <translation type="unfinished"></translation>
+        <translation>不再显示此提示</translation>
     </message>
     <message>
         <source>Missing Keyboard Layouts</source>
-        <translation type="unfinished"></translation>
+        <translation>缺少键盘布局</translation>
     </message>
     <message>
         <source>&lt;p&gt;Keyboard layout support requires matching layouts on all computers. The following layouts from the other computer are not installed on this computer:&lt;/p&gt;&lt;p&gt;&lt;b&gt;%1&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Please install them to enable support for these layouts.&lt;/p&gt;</source>
-        <translation type="unfinished"></translation>
+        <translation>&lt;p&gt;两台电脑需要安装匹配的键盘布局。本机缺少来自另一台电脑的以下布局：&lt;/p&gt;&lt;p&gt;&lt;b&gt;%1&lt;/b&gt;&lt;/p&gt;&lt;p&gt;安装这些布局后即可使用。&lt;/p&gt;</translation>
+    </message>
+    <message>
+        <source>Deskflow</source>
+        <translation>Deskflow</translation>
+    </message>
+    <message>
+        <source>One keyboard and mouse. Across your computers.</source>
+        <translation>一套键盘和鼠标，轻松控制多台电脑。</translation>
+    </message>
+    <message>
+        <source>Ready to set up</source>
+        <translation>开始连接你的电脑</translation>
+    </message>
+    <message>
+        <source>Choose where your keyboard and mouse come from to get started.</source>
+        <translation>先选择：用这台电脑的键鼠控制其他电脑，还是接收其他电脑的键鼠。</translation>
+    </message>
+    <message>
+        <source>This computer</source>
+        <translation>本机信息</translation>
+    </message>
+    <message>
+        <source>Name:</source>
+        <translation>电脑名称：</translation>
+    </message>
+    <message>
+        <source>Use letters, numbers, underscores or hyphens. Press Enter to save, or Escape to cancel.</source>
+        <translation>使用字母、数字、下划线或连字符。按 Enter 保存，按 Esc 取消。</translation>
+    </message>
+    <message>
+        <source>Computer name</source>
+        <translation>电脑名称</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>修改名称</translation>
+    </message>
+    <message>
+        <source>Choose how this computer works</source>
+        <translation>这台电脑如何使用键鼠</translation>
+    </message>
+    <message>
+        <source>Se&amp;nd keyboard and mouse</source>
+        <translation>发送键鼠(&amp;N)</translation>
+    </message>
+    <message>
+        <source>Server: use the keyboard and mouse attached to this computer.</source>
+        <translation>服务器：使用连接在本机的键盘和鼠标。</translation>
+    </message>
+    <message>
+        <source>&amp;Receive keyboard and mouse</source>
+        <translation>接收键鼠(&amp;R)</translation>
+    </message>
+    <message>
+        <source>Client: control this computer from another computer.</source>
+        <translation>客户端：由另一台电脑的键鼠控制本机。</translation>
+    </message>
+    <message>
+        <source>Control your other computers with the devices attached here. This is the server.</source>
+        <translation>键鼠接在本机，用来控制其他电脑。本机作为服务器。</translation>
+    </message>
+    <message>
+        <source>Use the devices attached to another computer to control this one. This is a client.</source>
+        <translation>键鼠接在另一台电脑，用来控制本机。本机作为客户端。</translation>
+    </message>
+    <message>
+        <source>Configure &amp;computers…</source>
+        <translation>排列电脑位置(&amp;C)…</translation>
+    </message>
+    <message>
+        <source>Arrange the computers to match their positions on your desk.</source>
+        <translation>按桌面上实际的左右位置排列电脑。</translation>
+    </message>
+    <message>
+        <source>Select Send or Receive above. You can change this later.</source>
+        <translation>选择上方的“发送键鼠”或“接收键鼠”，之后可以随时修改。</translation>
+    </message>
+    <message>
+        <source>Server &amp;address:</source>
+        <translation>服务器地址(&amp;A)：</translation>
+    </message>
+    <message>
+        <source>Enter the server computer&apos;s name or IP address.</source>
+        <translation>填写连接了键鼠的电脑名称或 IP 地址。</translation>
+    </message>
+    <message>
+        <source>Client &amp;options…</source>
+        <translation>接收选项(&amp;O)…</translation>
+    </message>
+    <message>
+        <source>&amp;Microphone settings…</source>
+        <translation>麦克风设置(&amp;M)…</translation>
+    </message>
+    <message>
+        <source>Configure optional microphone forwarding and the virtual audio devices used by your apps.</source>
+        <translation>设置麦克风跟随鼠标切换，以及应用使用的虚拟音频设备。</translation>
+    </message>
+    <message>
+        <source>Computer name or IP address</source>
+        <translation>电脑名称或 IP 地址</translation>
+    </message>
+    <message>
+        <source>&amp;Connect</source>
+        <translation>连接(&amp;C)</translation>
+    </message>
+    <message>
+        <source>&amp;Disconnect</source>
+        <translation>断开连接(&amp;C)</translation>
+    </message>
+    <message>
+        <source>Ready to share</source>
+        <translation>准备发送键鼠</translation>
+    </message>
+    <message>
+        <source>Arrange your computers, then select Start to share this keyboard and mouse.</source>
+        <translation>先排列电脑位置，再点击“启动共享”，即可使用本机键鼠控制其他电脑。</translation>
+    </message>
+    <message>
+        <source>Not connected</source>
+        <translation>尚未连接</translation>
+    </message>
+    <message>
+        <source>Enter the server computer&apos;s name or IP address, then select Connect.</source>
+        <translation>填写连接了键鼠的服务器名称或 IP 地址，然后点击“连接”。</translation>
+    </message>
+    <message>
+        <source>Select Connect to use the keyboard and mouse from %1.</source>
+        <translation>点击“连接”，即可使用 %1 的键鼠控制本机。</translation>
+    </message>
+    <message>
+        <source>Starting…</source>
+        <translation>正在启动…</translation>
+    </message>
+    <message>
+        <source>Deskflow is starting. Connection status will appear here in a moment.</source>
+        <translation>Deskflow 正在启动，连接状态稍后会显示在这里。</translation>
+    </message>
+    <message>
+        <source>Stopping…</source>
+        <translation>正在停止…</translation>
+    </message>
+    <message>
+        <source>Ending keyboard and mouse sharing. Please wait a moment.</source>
+        <translation>正在结束键鼠共享，请稍候。</translation>
+    </message>
+    <message>
+        <source>Waiting to retry</source>
+        <translation>等待重新连接</translation>
+    </message>
+    <message>
+        <source>Check your network and server configuration. Deskflow will try again automatically.</source>
+        <translation>请检查网络和服务器设置，Deskflow 会自动重试。</translation>
+    </message>
+    <message>
+        <source>Check the server address and network. Deskflow will try again automatically.</source>
+        <translation>请检查服务器地址和网络，Deskflow 会自动重试。</translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <translation>已连接</translation>
+    </message>
+    <message>
+        <source>Your keyboard and mouse can control the connected computers.</source>
+        <translation>你现在可以使用本机键鼠控制已连接的电脑。</translation>
+    </message>
+    <message>
+        <source>This computer is using the keyboard and mouse from %1.</source>
+        <translation>本机正在使用来自 %1 的键盘和鼠标。</translation>
+    </message>
+    <message>
+        <source>Waiting for computers</source>
+        <translation>等待其他电脑连接</translation>
+    </message>
+    <message>
+        <source>On the other computer, choose Receive and enter this computer&apos;s name or IP address.</source>
+        <translation>在另一台电脑选择“接收键鼠”，并填写本机名称或 IP 地址。</translation>
+    </message>
+    <message>
+        <source>Waiting for server</source>
+        <translation>等待服务器</translation>
+    </message>
+    <message>
+        <source>Check that the other computer is running Deskflow in Send mode.</source>
+        <translation>请确认另一台电脑已启动 Deskflow，并选择了“发送键鼠”。</translation>
+    </message>
+    <message>
+        <source>Connecting…</source>
+        <translation>正在连接…</translation>
+    </message>
+    <message>
+        <source>Check that %1 is running Deskflow in Send mode and is reachable on your network.</source>
+        <translation>请确认 %1 已启动 Deskflow 的“发送键鼠”，且网络可以互通。</translation>
+    </message>
+    <message>
+        <source>No computers connected</source>
+        <translation>当前没有电脑连接</translation>
+    </message>
+    <message>
+        <source>Check your network and the computer arrangement. Other computers must use Receive mode.</source>
+        <translation>请检查网络和电脑排列；另一台电脑需要选择“接收键鼠”。</translation>
+    </message>
+    <message>
+        <source>Check the server address, network and certificate prompts on both computers.</source>
+        <translation>请检查服务器地址、网络，以及两台电脑上的证书确认提示。</translation>
+    </message>
+</context>
+<context>
+    <name>MicrophoneSettingsWidget</name>
+    <message>
+        <source>Microphone settings error</source>
+        <translation>麦克风设置错误</translation>
+    </message>
+    <message>
+        <source>&amp;Enable microphone following</source>
+        <translation>启用麦克风跟随鼠标(&amp;E)</translation>
+    </message>
+    <message>
+        <source>Physical &amp;microphone:</source>
+        <translation>物理麦克风(&amp;M)：</translation>
+    </message>
+    <message>
+        <source>&amp;Virtual audio output:</source>
+        <translation>虚拟音频输出(&amp;V)：</translation>
+    </message>
+    <message>
+        <source>Target &amp;Mac computer:</source>
+        <translation>目标 Mac 名称(&amp;A)：</translation>
+    </message>
+    <message>
+        <source>Mac SHA-256 &amp;fingerprint:</source>
+        <translation>Mac 证书指纹(&amp;F)：</translation>
+    </message>
+    <message>
+        <source>&amp;Refresh devices</source>
+        <translation>刷新设备(&amp;R)</translation>
+    </message>
+    <message>
+        <source>Refresh the device list without recording audio. Unavailable selections are retained.</source>
+        <translation>只刷新设备列表，不录音；保留暂时不可用的已选设备。</translation>
+    </message>
+    <message>
+        <source>Copy the Mac&apos;s SHA-256 certificate fingerprint</source>
+        <translation>粘贴并核对 Mac 的 SHA-256 证书指纹</translation>
+    </message>
+    <message>
+        <source>64 hexadecimal characters; spaces and colons are accepted. Verify this on the Mac.</source>
+        <translation>64 位十六进制字符，可包含空格和冒号。请在 Mac 上核对。</translation>
+    </message>
+    <message>
+        <source>Use the exact computer name shown in Deskflow on the Mac.</source>
+        <translation>填写 Mac 上 Deskflow 显示的准确电脑名称。</translation>
+    </message>
+    <message>
+        <source>This build does not include microphone following. Install a microphone-enabled build to use it.</source>
+        <translation>当前版本未包含麦克风共享，请安装启用了麦克风功能的版本。</translation>
+    </message>
+    <message>
+        <source>Share this Windows microphone with your Mac as the pointer moves between computers. Audio starts only after you save and connect.</source>
+        <translation>让 Windows 麦克风跟随鼠标，在本机与 Mac 之间切换。保存设置并连接后才开始传送声音。</translation>
+    </message>
+    <message>
+        <source>Receive the Windows microphone when the pointer is on this Mac. Configure the physical microphone and this Mac&apos;s identity on the Windows server.</source>
+        <translation>鼠标控制本机时，接收 Windows 的麦克风声音。请在 Windows 服务器上选择物理麦克风，并填写本机名称和证书指纹。</translation>
+    </message>
+    <message>
+        <source>Microphone following supports a Windows server and a Mac client. Change the computer role on the main window to configure a supported route.</source>
+        <translation>麦克风跟随支持 Windows 发送端与 Mac 接收端。请先在主窗口选择对应的键鼠角色。</translation>
+    </message>
+    <message>
+        <source>Install &lt;a href=&quot;https://existential.audio/blackhole/&quot;&gt;BlackHole 2ch&lt;/a&gt;, refresh devices, and select it here. In calling or recording apps, select BlackHole 2ch as the microphone. Enable TLS in the Security section of the Network tab. Deskflow does not install drivers or change your sound defaults.</source>
+        <translation>安装 &lt;a href="https://existential.audio/blackhole/"&gt;BlackHole 2ch&lt;/a&gt;，刷新设备后在这里选中它。通话或录音应用的麦克风也选择 BlackHole 2ch，并在“网络”页的“安全”区域启用 TLS。Deskflow 不会安装驱动或修改系统默认音频设备。</translation>
+    </message>
+    <message>
+        <source>Install &lt;a href=&quot;https://vb-audio.com/Cable/&quot;&gt;VB-CABLE&lt;/a&gt; on Windows and &lt;a href=&quot;https://existential.audio/blackhole/&quot;&gt;BlackHole 2ch&lt;/a&gt; on the Mac. Select CABLE Input here; select CABLE Output as the microphone in Windows apps and BlackHole 2ch in Mac apps. Enable TLS and client fingerprint verification in the Security section of the Network tab. Deskflow does not install drivers or change your sound defaults.</source>
+        <translation>Windows 安装 &lt;a href="https://vb-audio.com/Cable/"&gt;VB-CABLE&lt;/a&gt;，Mac 安装 &lt;a href="https://existential.audio/blackhole/"&gt;BlackHole 2ch&lt;/a&gt;。这里的虚拟输出选择 CABLE Input；Windows 应用的麦克风选择 CABLE Output，Mac 应用选择 BlackHole 2ch。在“网络”页的“安全”区域启用 TLS 和客户端指纹校验。Deskflow 不会安装驱动或修改系统默认音频设备。</translation>
+    </message>
+    <message>
+        <source>Select a device…</source>
+        <translation>请选择设备…</translation>
+    </message>
+    <message>
+        <source>%1 (unavailable or unsupported)</source>
+        <translation>%1（不可用或不支持）</translation>
+    </message>
+    <message>
+        <source>Cannot save microphone settings: %1</source>
+        <translation>无法保存麦克风设置：%1</translation>
+    </message>
+    <message>
+        <source>Select a physical microphone.</source>
+        <translation>请选择物理麦克风。</translation>
+    </message>
+    <message>
+        <source>Select a virtual audio output. Install the driver and refresh devices if it is missing.</source>
+        <translation>请选择虚拟音频输出。找不到设备时，请安装驱动后刷新设备列表。</translation>
+    </message>
+    <message>
+        <source>Multiple audio devices have the same name. Give them unique names in system audio settings and refresh devices.</source>
+        <translation>有多个音频设备使用相同名称。请在系统声音设置中改成不同名称，再刷新设备。</translation>
+    </message>
+    <message>
+        <source>%1 is unavailable. Reconnect it or select another device, then refresh devices.</source>
+        <translation>%1 当前不可用。请重新连接或选择其他设备，再刷新列表。</translation>
+    </message>
+    <message>
+        <source>Select a physical microphone, not a virtual or loopback recording device.</source>
+        <translation>请选择真实麦克风，不能使用虚拟声卡或回环录音设备。</translation>
+    </message>
+    <message>
+        <source>Select a virtual audio output such as CABLE Input or BlackHole 2ch.</source>
+        <translation>请选择 CABLE Input 或 BlackHole 2ch 等虚拟音频输出。</translation>
+    </message>
+    <message>
+        <source>%1 must support 48 kHz mono or stereo audio. Check its format in system audio settings.</source>
+        <translation>%1 需要支持 48 kHz 单声道或双声道音频，请检查系统声音设置中的格式。</translation>
+    </message>
+    <message>
+        <source>Install a microphone-enabled Deskflow build, or disable microphone following.</source>
+        <translation>请安装包含麦克风功能的 Deskflow，或关闭麦克风跟随。</translation>
+    </message>
+    <message>
+        <source>Use a Windows server or a Mac client, or disable microphone following.</source>
+        <translation>请选择 Windows 发送端或 Mac 接收端，或关闭麦克风跟随。</translation>
+    </message>
+    <message>
+        <source>Enable TLS and, on the Windows server, client fingerprint verification in the Security section of the Network tab.</source>
+        <translation>请在“网络”页的“安全”区域启用 TLS；Windows 服务器还需要启用客户端指纹校验。</translation>
+    </message>
+    <message>
+        <source>Enter the target Mac&apos;s Deskflow computer name.</source>
+        <translation>请填写目标 Mac 在 Deskflow 中的电脑名称。</translation>
+    </message>
+    <message>
+        <source>Enter the Mac&apos;s 64-character hexadecimal SHA-256 certificate fingerprint.</source>
+        <translation>请填写 Mac 的 SHA-256 证书指纹，需要 64 位十六进制字符。</translation>
+    </message>
+    <message>
+        <source>Use 1–255 letters, numbers, underscores, hyphens or dots with no spaces, matching the Mac&apos;s Deskflow computer name.</source>
+        <translation>请使用 1–255 个字母、数字、下划线、连字符或点，不含空格，并与 Mac 的 Deskflow 电脑名称完全一致。</translation>
     </message>
 </context>
 <context>
@@ -1179,7 +1518,7 @@ Enabling this setting will disable the server config GUI.</source>
     </message>
     <message>
         <source>Always run as system (work at login screen and UAC)</source>
-        <translation type="unfinished">始终以系统身份运行 (在登录屏幕和 UAC 下工作)</translation>
+        <translation type="obsolete">始终以系统身份运行 (在登录屏幕和 UAC 下工作)</translation>
     </message>
     <message>
         <source>Language</source>
@@ -1203,11 +1542,11 @@ Enabling this setting will disable the server config GUI.</source>
     </message>
     <message>
         <source>%1 Clear Settings</source>
-        <translation type="unfinished">%1 清除设置</translation>
+        <translation>清除 %1 设置</translation>
     </message>
     <message>
         <source>&lt;p&gt;Are you sure you want to clear all settings and restart %1?&lt;/p&gt; &lt;p&gt;This action cannot be undone.&lt;/p&gt;</source>
-        <translation type="unfinished">&lt;p&gt;您确定要清除所有设置并重新启动 %1 吗？&lt;/p&gt; &lt;p&gt;此操作无法撤销。&lt;/p&gt;</translation>
+        <translation>&lt;p&gt;确定清除所有设置并重新启动 %1 吗？&lt;/p&gt;&lt;p&gt;此操作无法撤销。&lt;/p&gt;</translation>
     </message>
     <message>
         <source>Required messages</source>
@@ -1235,11 +1574,11 @@ Enabling this setting will disable the server config GUI.</source>
     </message>
     <message>
         <source>Automatic</source>
-        <translation type="unfinished">自动的</translation>
+        <translation>自动</translation>
     </message>
     <message>
         <source>Include version in the window title</source>
-        <translation type="unfinished">在窗口标题中包含版本信息</translation>
+        <translation>在窗口标题中显示版本号</translation>
     </message>
     <message>
         <source>Log to file</source>
@@ -1247,7 +1586,7 @@ Enabling this setting will disable the server config GUI.</source>
     </message>
     <message>
         <source>&amp;Logs</source>
-        <translation type="unfinished">日志(&amp;L)</translation>
+        <translation>日志(&amp;L)</translation>
     </message>
     <message>
         <source>&amp;General</source>
@@ -1259,43 +1598,47 @@ Enabling this setting will disable the server config GUI.</source>
     </message>
     <message>
         <source>&amp;Window</source>
-        <translation type="unfinished">窗户(&amp;W)</translation>
+        <translation>窗口(&amp;W)</translation>
     </message>
     <message>
         <source>When the main window is closed</source>
-        <translation type="unfinished">主窗口关闭时</translation>
+        <translation>关闭主窗口时</translation>
     </message>
     <message>
         <source>Exit</source>
-        <translation type="unfinished">出口</translation>
+        <translation>退出程序</translation>
     </message>
     <message>
         <source>Send to background</source>
-        <translation type="unfinished">发送到后台</translation>
+        <translation>转入后台运行</translation>
     </message>
     <message>
         <source>When the application starts</source>
-        <translation type="unfinished">应用程序启动时</translation>
+        <translation>启动程序时</translation>
     </message>
     <message>
         <source>Show the main window</source>
-        <translation type="unfinished">显示主窗口</translation>
+        <translation>显示主窗口</translation>
     </message>
     <message>
         <source>Run command on enter</source>
-        <translation type="unfinished">按下回车键执行命令</translation>
+        <translation>进入此电脑时运行命令</translation>
     </message>
     <message>
         <source>Run command on exit</source>
-        <translation type="unfinished">退出时运行命令</translation>
+        <translation>离开此电脑时运行命令</translation>
     </message>
     <message>
         <source>Using a log level higher than Info may affect performance.</source>
-        <translation type="unfinished">使用高于 Info 级别的日志级别可能会影响性能。</translation>
+        <translation>高于 Info 的日志级别可能影响性能。</translation>
     </message>
     <message>
         <source>Remove all settings</source>
-        <translation type="unfinished">移除所有设置</translation>
+        <translation>清除所有设置</translation>
+    </message>
+    <message>
+        <source>&amp;Microphone</source>
+        <translation>麦克风(&amp;M)</translation>
     </message>
 </context>
 <context>

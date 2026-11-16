@@ -2,11 +2,9 @@
 # SPDX-License-Identifier: MIT
 
 if(CPACK_GENERATOR MATCHES 7Z|ZIP)
-  string(REPLACE " " "*" _TEMP_LIST "@CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS@")
-  set(${PORTABLE_LIBS} "")
-  foreach(ITEM ${_TEMP_LIST})
-    string(REPLACE "*" " " _ITEM ${ITEM})
-    file(COPY ${_ITEM} DESTINATION ${CPACK_TEMPORARY_INSTALL_DIRECTORY})
+  set(_portable_runtime_libs "@CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS@")
+  foreach(_ITEM IN LISTS _portable_runtime_libs)
+    file(COPY "${_ITEM}" DESTINATION "${CPACK_TEMPORARY_INSTALL_DIRECTORY}")
   endforeach()
   file(WRITE ${CPACK_TEMPORARY_INSTALL_DIRECTORY}/settings/Deskflow.conf " ")
   file(REMOVE ${CPACK_TEMPORARY_INSTALL_DIRECTORY}/deskflow-daemon.exe)

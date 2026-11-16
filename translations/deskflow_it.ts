@@ -488,7 +488,7 @@ Vuoi connetterti al server?
     <name>MainWindow</name>
     <message>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Name can&apos;t have have spaces or special characters&lt;/p&gt;&lt;p&gt;Use Enter to save the name change.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Il nome non può contenere spazi o caratteri speciali&lt;/p&gt;&lt;p&gt;Usa Invio per salvare la modifica del nome.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <translation type="vanished">&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Il nome non può contenere spazi o caratteri speciali&lt;/p&gt;&lt;p&gt;Usa Invio per salvare la modifica del nome.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
         <source>Edit Computer Name</source>
@@ -496,7 +496,7 @@ Vuoi connetterti al server?
     </message>
     <message>
         <source>&amp;Configure Server</source>
-        <translation>&amp;Configura Server</translation>
+        <translation type="vanished">&amp;Configura Server</translation>
     </message>
     <message>
         <source>Export server configuration</source>
@@ -504,7 +504,7 @@ Vuoi connetterti al server?
     </message>
     <message>
         <source>You must select a mode</source>
-        <translation>Devi selezionare una modalità</translation>
+        <translation type="vanished">Devi selezionare una modalità</translation>
     </message>
     <message>
         <source>&amp;Start</source>
@@ -588,19 +588,19 @@ Vuoi connetterti al server?
     </message>
     <message>
         <source>Start</source>
-        <translation>Avvia</translation>
+        <translation type="vanished">Avvia</translation>
     </message>
     <message>
         <source>Stop</source>
-        <translation>Ferma</translation>
+        <translation type="vanished">Ferma</translation>
     </message>
     <message>
         <source>Connect</source>
-        <translation>Connetti</translation>
+        <translation type="vanished">Connetti</translation>
     </message>
     <message>
         <source>Disconnect</source>
-        <translation>Disconnetti</translation>
+        <translation type="vanished">Disconnetti</translation>
     </message>
     <message>
         <source>%1 Connection Error</source>
@@ -689,31 +689,31 @@ Nomi validi:
     </message>
     <message>
         <source>This computer&apos;s name:</source>
-        <translation>Nome di questo computer:</translation>
+        <translation type="vanished">Nome di questo computer:</translation>
     </message>
     <message>
         <source>Use this computer&apos;s keyboard and mouse
 (make this computer the server)</source>
-        <translation>Usa tastiera e mouse di questo computer
+        <translation type="vanished">Usa tastiera e mouse di questo computer
 (imposta questo computer come server)</translation>
     </message>
     <message>
         <source>Use another computer’s mouse and keyboard
 (make this computer the client)</source>
-        <translation>Usa mouse e tastiera di un altro computer
+        <translation type="vanished">Usa mouse e tastiera di un altro computer
 (imposta questo computer come client)</translation>
     </message>
     <message>
         <source>&amp;Configure Client</source>
-        <translation type="unfinished">&amp;Configurare il client</translation>
+        <translation type="obsolete">&amp;Configurare il client</translation>
     </message>
     <message>
         <source>Connect to:</source>
-        <translation type="unfinished">Connettiti a:</translation>
+        <translation type="obsolete">Connettiti a:</translation>
     </message>
     <message>
         <source>&lt;html&gt;Hostname or IP address of the server computer.&lt;br/&gt;May contain a comma seperated list.&lt;/html&gt;</source>
-        <translation type="unfinished">&lt;html&gt;Nome host o indirizzo IP del computer server.&lt;br/&gt;Può contenere un elenco separato da virgole.&lt;/html&gt;</translation>
+        <translation type="obsolete">&lt;html&gt;Nome host o indirizzo IP del computer server.&lt;br/&gt;Può contenere un elenco separato da virgole.&lt;/html&gt;</translation>
     </message>
     <message>
         <source>read</source>
@@ -745,6 +745,345 @@ Inoltre, verifica di poter %1 il file di configurazione del server: %2</translat
     </message>
     <message>
         <source>&lt;p&gt;Keyboard layout support requires matching layouts on all computers. The following layouts from the other computer are not installed on this computer:&lt;/p&gt;&lt;p&gt;&lt;b&gt;%1&lt;/b&gt;&lt;/p&gt;&lt;p&gt;Please install them to enable support for these layouts.&lt;/p&gt;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Deskflow</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>One keyboard and mouse. Across your computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ready to set up</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose where your keyboard and mouse come from to get started.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This computer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Name:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use letters, numbers, underscores or hyphens. Press Enter to save, or Escape to cancel.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Computer name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose how this computer works</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Se&amp;nd keyboard and mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Server: use the keyboard and mouse attached to this computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Receive keyboard and mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Client: control this computer from another computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Control your other computers with the devices attached here. This is the server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use the devices attached to another computer to control this one. This is a client.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Configure &amp;computers…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arrange the computers to match their positions on your desk.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select Send or Receive above. You can change this later.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Server &amp;address:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter the server computer&apos;s name or IP address.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Client &amp;options…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Microphone settings…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Configure optional microphone forwarding and the virtual audio devices used by your apps.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Computer name or IP address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Connect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Disconnect</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ready to share</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Arrange your computers, then select Start to share this keyboard and mouse.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Not connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter the server computer&apos;s name or IP address, then select Connect.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select Connect to use the keyboard and mouse from %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Starting…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Deskflow is starting. Connection status will appear here in a moment.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stopping…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Ending keyboard and mouse sharing. Please wait a moment.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting to retry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check your network and server configuration. Deskflow will try again automatically.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check the server address and network. Deskflow will try again automatically.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Your keyboard and mouse can control the connected computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This computer is using the keyboard and mouse from %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for computers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On the other computer, choose Receive and enter this computer&apos;s name or IP address.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for server</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check that the other computer is running Deskflow in Send mode.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connecting…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check that %1 is running Deskflow in Send mode and is reachable on your network.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No computers connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check your network and the computer arrangement. Other computers must use Receive mode.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check the server address, network and certificate prompts on both computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>MicrophoneSettingsWidget</name>
+    <message>
+        <source>Microphone settings error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Enable microphone following</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Physical &amp;microphone:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Virtual audio output:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Target &amp;Mac computer:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mac SHA-256 &amp;fingerprint:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>&amp;Refresh devices</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Refresh the device list without recording audio. Unavailable selections are retained.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Copy the Mac&apos;s SHA-256 certificate fingerprint</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>64 hexadecimal characters; spaces and colons are accepted. Verify this on the Mac.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use the exact computer name shown in Deskflow on the Mac.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This build does not include microphone following. Install a microphone-enabled build to use it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Share this Windows microphone with your Mac as the pointer moves between computers. Audio starts only after you save and connect.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Receive the Windows microphone when the pointer is on this Mac. Configure the physical microphone and this Mac&apos;s identity on the Windows server.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Microphone following supports a Windows server and a Mac client. Change the computer role on the main window to configure a supported route.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Install &lt;a href=&quot;https://existential.audio/blackhole/&quot;&gt;BlackHole 2ch&lt;/a&gt;, refresh devices, and select it here. In calling or recording apps, select BlackHole 2ch as the microphone. Enable TLS in the Security section of the Network tab. Deskflow does not install drivers or change your sound defaults.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Install &lt;a href=&quot;https://vb-audio.com/Cable/&quot;&gt;VB-CABLE&lt;/a&gt; on Windows and &lt;a href=&quot;https://existential.audio/blackhole/&quot;&gt;BlackHole 2ch&lt;/a&gt; on the Mac. Select CABLE Input here; select CABLE Output as the microphone in Windows apps and BlackHole 2ch in Mac apps. Enable TLS and client fingerprint verification in the Security section of the Network tab. Deskflow does not install drivers or change your sound defaults.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a device…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 (unavailable or unsupported)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot save microphone settings: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a physical microphone.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a virtual audio output. Install the driver and refresh devices if it is missing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Multiple audio devices have the same name. Give them unique names in system audio settings and refresh devices.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 is unavailable. Reconnect it or select another device, then refresh devices.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a physical microphone, not a virtual or loopback recording device.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a virtual audio output such as CABLE Input or BlackHole 2ch.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 must support 48 kHz mono or stereo audio. Check its format in system audio settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Install a microphone-enabled Deskflow build, or disable microphone following.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use a Windows server or a Mac client, or disable microphone following.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable TLS and, on the Windows server, client fingerprint verification in the Security section of the Network tab.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter the target Mac&apos;s Deskflow computer name.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter the Mac&apos;s 64-character hexadecimal SHA-256 certificate fingerprint.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use 1–255 letters, numbers, underscores, hyphens or dots with no spaces, matching the Mac&apos;s Deskflow computer name.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1173,7 +1512,7 @@ L&apos;abilitazione di questa impostazione disabiliterà l&apos;interfaccia graf
     </message>
     <message>
         <source>Always run as system (work at login screen and UAC)</source>
-        <translation>Esegui sempre come sistema (funziona nella schermata di accesso e UAC)</translation>
+        <translation type="vanished">Esegui sempre come sistema (funziona nella schermata di accesso e UAC)</translation>
     </message>
     <message>
         <source>%1 Clear Settings</source>
@@ -1294,6 +1633,10 @@ L&apos;abilitazione di questa impostazione disabiliterà l&apos;interfaccia graf
     <message>
         <source>Remove all settings</source>
         <translation type="unfinished">Rimuovi tutte le impostazioni</translation>
+    </message>
+    <message>
+        <source>&amp;Microphone</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

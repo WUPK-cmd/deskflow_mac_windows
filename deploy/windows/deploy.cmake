@@ -21,7 +21,7 @@ list(APPEND CPACK_GENERATOR "ZIP")
 
 # If Wix4+ is installed make a package
 find_program(WIX_APP wix)
-if (NOT "${WIX_APP}" STREQUAL "")
+if(WIX_APP)
   set(CPACK_WIX_VERSION 4)
   set(CPACK_WIX_ARCHITECTURE ${BUILD_ARCHITECTURE})
   list(APPEND CPACK_GENERATOR "WIX")
