@@ -43,6 +43,17 @@ def smoke_environment(root, mac):
     return env
 
 
+def verify_macho_dependencies(output, binary):
+    # otool includes the inspected file's absolute path (and architecture) as
+    # section headers. Only indented load-command entries are dependencies.
+    for line in output.splitlines():
+        if not line.startswith("\t"):
+            continue
+        dependency = line.strip().split(" (compatibility version", 1)[0]
+        if dependency.startswith(("/opt/homebrew/", "/usr/local/", "/Users/")):
+            raise ValueError(f"Developer dependency in {binary}: {dependency}")
+
+
 def record(args):
     if run("git", "status", "--porcelain", "--untracked-files=no"):
         raise ValueError("Tracked source changed during build")
@@ -110,8 +121,7 @@ def verify_tree(args):
             raise ValueError("Qt Multimedia framework binary is missing")
         for dependency in [*multimedia_objects, *plugins]:
             links = run("/usr/bin/otool", "-L", str(dependency))
-            if re.search(r"(?:/opt/homebrew/|/usr/local/|/Users/)", links):
-                raise ValueError(f"Developer dependency in Multimedia runtime/backend: {dependency}")
+            verify_macho_dependencies(links, dependency)
     for path in root.rglob("*"):
         name = path.name.lower()
         if path.suffix.lower() in {".pem", ".key", ".log", ".sys", ".kext", ".dext"}:
@@ -137,8 +147,7 @@ def verify_tree(args):
                 if run("/usr/bin/lipo", "-archs", str(binary)) != "arm64":
                     raise ValueError(f"Unexpected binary architecture: {binary}")
                 dependencies = run("/usr/bin/otool", "-L", str(binary))
-                if re.search(r"(?:/opt/homebrew/|/usr/local/|/Users/)", dependencies):
-                    raise ValueError(f"Developer dependency in {binary}")
+                verify_macho_dependencies(dependencies, binary)
             else:
                 with binary.open("rb") as stream:
                     stream.seek(0x3C)

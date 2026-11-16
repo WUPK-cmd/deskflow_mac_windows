@@ -8,12 +8,28 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from package_identity import manifest, smoke_environment, verify_config
+from package_identity import manifest, smoke_environment, verify_config, verify_macho_dependencies
 from reviewed_release import REPOSITORY, WORKFLOW, verify_assets, verify_identity, verify_run
 
 
 class ReleaseVerification(unittest.TestCase):
     sha = "a" * 40
+
+    def test_mac_dependency_headers_may_name_the_runner_checkout(self):
+        output = (
+            "/Users/runner/staging/QtMultimedia (architecture arm64):\n"
+            "\t@rpath/QtCore.framework/Versions/A/QtCore (compatibility version 6.0.0, current version 6.8.3)\n"
+            "\t/System/Library/Frameworks/CoreAudio.framework/CoreAudio (compatibility version 1.0.0, current version 1.0.0)\n"
+        )
+        verify_macho_dependencies(output, "QtMultimedia")
+
+    def test_mac_actual_developer_load_commands_are_rejected(self):
+        for prefix in ("/opt/homebrew/", "/usr/local/", "/Users/developer/"):
+            with self.subTest(prefix=prefix), self.assertRaises(ValueError):
+                verify_macho_dependencies(
+                    f"/Users/runner/App:\n\t{prefix}libssl.3.dylib (compatibility version 3.0.0, current version 3.0.0)\n",
+                    "App",
+                )
 
     def test_windows_package_smoke_uses_copied_uppercase_environment(self):
         with patch.dict(os.environ, {

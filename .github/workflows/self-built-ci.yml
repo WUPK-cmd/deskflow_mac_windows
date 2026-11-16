@@ -179,9 +179,11 @@ jobs:
           python .github/scripts/package_identity.py verify-tree --target windows-x64 --root package-check/portable --identity build-info.json --portable
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Administrative extraction on the disposable runner; no service/product installation.
-          $msiRoot = "$env:GITHUB_WORKSPACE/package-check/msi"
+          # MSI's TARGETDIR parser rejects forward slashes even though PowerShell accepts them.
+          $msiRoot = [IO.Path]::GetFullPath((Join-Path $env:GITHUB_WORKSPACE 'package-check/msi'))
+          $msiLog = [IO.Path]::GetFullPath((Join-Path $env:GITHUB_WORKSPACE 'build/msi-extraction.log'))
           New-Item -ItemType Directory -Path $msiRoot -Force | Out-Null
-          $extract = Start-Process msiexec.exe -ArgumentList @('/a', "`"$($msis[0].FullName)`"", '/qn', "TARGETDIR=`"$msiRoot`"", '/L*v', "`"$env:GITHUB_WORKSPACE/build/msi-extraction.log`"") -PassThru -Wait -WindowStyle Hidden
+          $extract = Start-Process msiexec.exe -ArgumentList @('/a', "`"$($msis[0].FullName)`"", '/qn', "TARGETDIR=`"$msiRoot`"", '/L*v', "`"$msiLog`"") -PassThru -Wait -WindowStyle Hidden
           if ($extract.ExitCode -ne 0) { throw "MSI extraction failed: $($extract.ExitCode)" }
           python .github/scripts/package_identity.py verify-tree --target windows-x64 --root $msiRoot --identity build-info.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
