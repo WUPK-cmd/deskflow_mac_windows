@@ -1,5 +1,6 @@
 > 本仓库包含 Windows / macOS 键鼠共享的自制版修复。
-> [构建与双端验收说明](../docs/SelfBuilt.md) · [下载同一提交的 Windows / macOS 构建](https://github.com/WUPK-cmd/deskflow_mac_windows/actions/workflows/self-built-ci.yml)
+> [中文使用手册：网线直连、剪贴板、麦克风共享](../docs/WindowsMac-Usage.zh-CN.md) · [构建与双端验收说明](../docs/SelfBuilt.md)
+> 常规 [Actions 构建](https://github.com/WUPK-cmd/deskflow_mac_windows/actions/workflows/self-built-ci.yml)默认不含麦克风功能；使用麦克风请按手册开启两端编译选项。
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://github.com/deskflow/deskflow-artwork/blob/main/logo/deskflow-logo-dark-200px.png?raw=true">

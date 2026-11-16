@@ -2,7 +2,10 @@
 
 Deskflow is a free and open source keyboard and mouse sharing app. Use the keyboard, mouse, or trackpad of one computer to control nearby computers, and work seamlessly between them.
 
-[Homepage](https://deskflow.org) [Code](https://github.com/deskflow/deskflo)
+[Homepage](https://deskflow.org) [Code](https://github.com/deskflow/deskflow)
+
+本仓库的 Windows/Mac 使用方法、有线直连、双向剪贴板及麦克风配置见
+[中文使用手册](WindowsMac-Usage.zh-CN.md)。
 
 For this fork's Windows/macOS builds, updates, rollback and native two-host acceptance, see
 [Self-built Windows/macOS](SelfBuilt.md).

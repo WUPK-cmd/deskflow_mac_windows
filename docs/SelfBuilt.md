@@ -1,6 +1,8 @@
 # Building and accepting the Windows/macOS fork
 
 This fork's source is [WUPK-cmd/deskflow_mac_windows](https://github.com/WUPK-cmd/deskflow_mac_windows).
+For day-to-day setup, a direct Ethernet link, clipboard images and microphone routing, see the
+[Chinese Windows/Mac usage guide](WindowsMac-Usage.zh-CN.md).
 The **Self-built Windows and macOS** workflow runs on `main` and `codex/**` pushes, pull requests and manual dispatches.
 It compiles and tests Windows x64 and macOS arm64 with Qt 6.8.3, then uploads runtime ZIPs, SHA-256 checksums,
 `build-info.json`, and test evidence. Download both host artifacts from the **same workflow run**. On a pull

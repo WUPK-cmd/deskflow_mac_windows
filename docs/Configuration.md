@@ -162,6 +162,9 @@ This section contains options used when in server mode it will begin with `[serv
 
 ### Microphone switching
 
+For a complete Windows/Mac setup and acceptance checklist, see the
+[Chinese usage guide](WindowsMac-Usage.zh-CN.md).
+
 Build both Windows and macOS with Qt Multimedia and `-DBUILD_MICROPHONE_FOLLOW=ON`. Enable TLS and client fingerprint verification on the Windows server. Connect the Mac and verify each computer's fingerprint against the fingerprint shown on the other computer.
 
 Install a virtual audio cable on each computer. Use VB-CABLE on Windows and BlackHole 2ch on macOS. Leave the physical microphone available to Deskflow and select the virtual input in each app that should follow the pointer. [VB-CABLE](https://vb-audio.com/Cable/) · [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole)
