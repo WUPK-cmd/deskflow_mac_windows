@@ -8,6 +8,7 @@
 
 #include "gui/core/NetworkMonitor.h"
 
+#include <QNetworkInterface>
 #include <QSignalSpy>
 
 using namespace deskflow::gui;
@@ -33,4 +34,26 @@ void NetworkMonitorTests::testVirtualInterface()
   QVERIFY(!NetworkMonitor::isVirtualInterface(QStringLiteral("wifi")));
   QVERIFY(!NetworkMonitor::isVirtualInterface(QStringLiteral("wlan0")));
 }
+
+void NetworkMonitorTests::matchesActualLoopbackInterface()
+{
+  const QHostAddress local(QHostAddress::LocalHost);
+  QStringList matches;
+  for (const auto &interface : QNetworkInterface::allInterfaces()) {
+    if (!(interface.flags() & QNetworkInterface::IsUp))
+      continue;
+    for (const auto &entry : interface.addressEntries()) {
+      if (entry.ip() == local) {
+        matches.append(interface.humanReadableName());
+        break;
+      }
+    }
+  }
+  if (matches.size() != 1)
+    QSKIP("This host does not have a unique IPv4 loopback interface");
+  QCOMPARE(NetworkMonitor::interfaceForAddress(local), matches.first());
+  QCOMPARE(NetworkMonitor::interfaceForAddress(QHostAddress("::ffff:127.0.0.1")), matches.first());
+  QVERIFY(NetworkMonitor::interfaceForAddress(QHostAddress()).isEmpty());
+}
+
 QTEST_MAIN(NetworkMonitorTests)

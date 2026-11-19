@@ -23,6 +23,9 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QHostAddress>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QMetaEnum>
 #include <QMutexLocker>
 #include <QRegularExpression>
@@ -186,6 +189,7 @@ void CoreProcess::checkExistingProcess()
 
 void CoreProcess::clearCoreConnectionState()
 {
+  m_connectionAddresses.clear();
   setConnectionState(ConnectionState::Disconnected);
   Q_EMIT connectedClientsChanged({});
   m_secureSocketVersion.clear();
@@ -725,6 +729,22 @@ void CoreProcess::onCoreIpcMessageReceived(const QString &command, const QString
   } else if (command == "connectedClients") {
     const auto clients = args.isEmpty() ? QStringList() : args.split(",");
     Q_EMIT connectedClientsChanged(clients);
+  } else if (command == "connectionAddresses") {
+    const auto paths = QJsonDocument::fromJson(args.toUtf8()).array();
+    QList<QPair<QString, QString>> addresses;
+    for (const auto &value : paths) {
+      const auto path = value.toArray();
+      if (path.size() != 2)
+        continue;
+      const QHostAddress local(path[0].toString());
+      const QHostAddress remote(path[1].toString());
+      if (!local.isNull() && !remote.isNull())
+        addresses.emplaceBack(local.toString(), remote.toString());
+    }
+    if (addresses != m_connectionAddresses) {
+      m_connectionAddresses = std::move(addresses);
+      Q_EMIT connectionAddressesChanged();
+    }
   } else if (command == "secureSocket") {
     Q_EMIT secureSocket(true);
     if (args != m_secureSocketVersion) {

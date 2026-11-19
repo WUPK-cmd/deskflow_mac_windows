@@ -51,6 +51,7 @@ public:
    * @return IP address list
    */
   static QStringList validAddresses();
+  static QString interfaceForAddress(const QHostAddress &address);
 
   /**
    * @brief Check if a network interface is virtual

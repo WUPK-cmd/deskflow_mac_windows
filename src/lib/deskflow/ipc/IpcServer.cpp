@@ -164,8 +164,9 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
 void IpcServer::broadcastCommand(const QString &command, const QString &args)
 {
   const auto message = args.isEmpty() ? command : QStringLiteral("%1=%2").arg(command, args);
-  const bool stateMessage = command == QStringLiteral("connectionState") ||
-                            command == QStringLiteral("connectedClients") || command == QStringLiteral("secureSocket");
+  const bool stateMessage =
+      command == QStringLiteral("connectionState") || command == QStringLiteral("connectedClients") ||
+      command == QStringLiteral("secureSocket") || command == QStringLiteral("connectionAddresses");
   if (stateMessage)
     m_stateMessages.insert(command, message);
 

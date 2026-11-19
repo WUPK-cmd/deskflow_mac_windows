@@ -347,12 +347,15 @@ void Server::sendConnectedClientsIpc() const
 {
   const auto primaryName = getName(m_primaryClient);
   QStringList clientList;
-  for (const auto &[name, _] : m_clients) {
+  QList<QPair<QString, QString>> addresses;
+  for (const auto &[name, client] : m_clients) {
     if (name != primaryName) {
       clientList.append(QString::fromStdString(name));
+      addresses.append(TCPSocket::connectionAddresses(client->getStream()));
     }
   }
   ipcSendToClient("connectedClients", clientList.join(","));
+  ipcSendConnectionAddresses(addresses);
 }
 
 std::string Server::getName(const BaseClientProxy *client) const
@@ -2043,6 +2046,11 @@ void Server::closeClients(const ServerConfig &config)
   // because closeClient() modifies the collection we iterate over.
   for (auto &client : removed) {
     closeClient(client, kMsgCClose);
+  }
+  if (!removed.empty()) {
+    using enum deskflow::core::ConnectionState;
+    ipcSendConnectionState(m_clients.size() <= 1 ? Listening : Connected);
+    sendConnectedClientsIpc();
   }
 }
 

@@ -8,15 +8,19 @@
 #include "arch/Arch.h"
 #include "arch/ArchException.h"
 #include "base/Log.h"
+#include "io/StreamFilter.h"
 #include "net/IDataSocket.h"
 #include "net/NetworkAddress.h"
 #include "net/SecureListenSocket.h"
 #include "net/SocketException.h"
 #include "net/SocketMultiplexer.h"
 #include "net/TCPListenSocket.h"
+#include "net/TCPSocket.h"
 
 #include <QRandomGenerator>
 #include <QSemaphore>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTest>
 
 #include <atomic>
@@ -53,10 +57,13 @@ class ListenEvents : public MockEventQueue
 {
 public:
   QSemaphore incoming;
+  QSemaphore connected;
   void addEvent(Event &&event) override
   {
     if (event.getType() == EventTypes::ListenSocketConnecting)
       incoming.release();
+    if (event.getType() == EventTypes::DataSocketConnected)
+      connected.release();
     Event::deleteData(event);
   }
 };
@@ -125,6 +132,43 @@ private Q_SLOTS:
       auto accepted = listener->accept();
       QVERIFY(accepted);
     }
+  }
+
+  void connectedSocketReportsActualAddresses_data()
+  {
+    QTest::addColumn<bool>("ipv6");
+    QTest::newRow("IPv4") << false;
+    QTest::newRow("IPv6") << true;
+  }
+
+  void connectedSocketReportsActualAddresses()
+  {
+    QFETCH(bool, ipv6);
+    const auto host = QHostAddress(ipv6 ? QHostAddress::LocalHostIPv6 : QHostAddress::LocalHost);
+    QTcpServer server;
+    if (!server.listen(host, 0) && ipv6)
+      QSKIP("IPv6 loopback is unavailable");
+    QVERIFY2(server.isListening(), qPrintable(server.errorString()));
+
+    ListenEvents events;
+    SocketMultiplexer multiplexer;
+    TCPSocket socket(
+        &events, &multiplexer, ipv6 ? IArchNetwork::AddressFamily::INet6 : IArchNetwork::AddressFamily::INet
+    );
+    StreamFilter filter(&events, &socket, false);
+    QCOMPARE(TCPSocket::connectionAddresses(&filter), (QPair<QString, QString>{}));
+
+    NetworkAddress destination(host.toString().toStdString(), server.serverPort());
+    destination.resolve();
+    socket.connect(destination);
+    QVERIFY2(server.waitForNewConnection(3000), qPrintable(server.errorString()));
+    QVERIFY2(events.connected.tryAcquire(1, 3000), "Loopback socket did not report a completed connection");
+    const auto *peer = server.nextPendingConnection();
+    QVERIFY(peer);
+    QCOMPARE(TCPSocket::connectionAddresses(&filter), qMakePair(peer->peerAddress().toString(), host.toString()));
+
+    socket.close();
+    QCOMPARE(TCPSocket::connectionAddresses(&filter), (QPair<QString, QString>{}));
   }
 
 private:

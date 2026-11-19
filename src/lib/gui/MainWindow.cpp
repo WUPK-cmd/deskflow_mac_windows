@@ -311,6 +311,7 @@ void MainWindow::connectSlots()
     connect(m_trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
 
   connect(&m_coreProcess, &CoreProcess::connectedClientsChanged, this, &MainWindow::serverClientsChanged);
+  connect(&m_coreProcess, &CoreProcess::connectionAddressesChanged, this, &MainWindow::updateNetworkInfo);
   connect(&m_coreProcess, &CoreProcess::unrecognisedClient, this, &MainWindow::handleUnrecognisedClient);
   connect(&m_coreProcess, &CoreProcess::connectionRefused, this, &MainWindow::handleConnectionRefused);
   connect(&m_coreProcess, &CoreProcess::retryIn, this, &MainWindow::updateTimeoutDelay);
@@ -582,13 +583,6 @@ void MainWindow::updateModeControls()
   ui->lblNoMode->setVisible(!isServer && !isClient);
   toggleCanRunCore(canRunCore());
 
-  ui->lblIpAddresses->setVisible(
-      (isClient && !Settings::value(Settings::Core::Interface).toString().isEmpty()) || isServer
-  );
-
-  if (ui->lblIpAddresses->isVisible())
-    updateNetworkInfo();
-
   if (isServer) {
     m_networkMonitor->startMonitoring();
   } else {
@@ -649,10 +643,6 @@ void MainWindow::updateSecurityIcon(bool visible)
 void MainWindow::updateNetworkInfo()
 {
   const auto mode = m_coreProcess.mode();
-  if (mode == CoreMode::None) {
-    return;
-  }
-
   if (mode == CoreMode::Server)
     updateIpLabel(NetworkMonitor::validAddresses());
   else
@@ -993,8 +983,8 @@ void MainWindow::updateStatus()
   const auto connection = m_coreProcess.connectionState();
   const auto process = m_coreProcess.processState();
   const bool isServer = (m_coreProcess.mode() == CoreMode::Server);
+  updateNetworkInfo();
   if (process == Stopped || process == Started) {
-    updateNetworkInfo();
     ui->btnEditName->setVisible(process == Stopped);
   }
   m_statusBar->setStatus(connection, process, isServer);
@@ -1407,13 +1397,33 @@ void MainWindow::remoteHostChanged(const QString &newRemoteHost)
 void MainWindow::updateIpLabel(const QStringList &addresses)
 {
   const auto mode = m_coreProcess.mode();
-  if (mode == CoreMode::None) {
-    return;
-  }
-
   static const auto colorText = QStringLiteral(R"(<span style="color:%1;">%2</span>)");
   const bool serverStarted = m_coreProcess.isStarted();
   const bool fixedIP = !Settings::value(Settings::Core::Interface).toString().isEmpty();
+
+  const auto &activeAddresses = m_coreProcess.connectionAddresses();
+  if (mode != CoreMode::None && serverStarted && m_coreProcess.connectionState() == ConnectionState::Connected &&
+      !activeAddresses.isEmpty()) {
+    QStringList paths;
+    for (const auto &[local, remote] : activeAddresses) {
+      auto path = QStringLiteral("%1 ↔ %2").arg(local, remote);
+      const auto interfaceName = NetworkMonitor::interfaceForAddress(QHostAddress(local));
+      if (!interfaceName.isEmpty())
+        path += QStringLiteral(" (%1)").arg(interfaceName);
+      paths.append(path.toHtmlEscaped());
+    }
+    const auto text = paths.size() == 1 ? tr("Active connection: %1").arg(paths.first())
+                                        : tr("Active connections: %1").arg(paths.size());
+    ui->lblIpAddresses->setText(QStringLiteral("<span>%1</span>").arg(text));
+    ui->lblIpAddresses->setToolTip(QStringLiteral("<p>%1</p>").arg(paths.join(QStringLiteral("<br>"))));
+    ui->lblIpAddresses->show();
+    return;
+  }
+
+  const bool showAddress = mode == CoreMode::Server || (mode == CoreMode::Client && fixedIP);
+  ui->lblIpAddresses->setVisible(showAddress);
+  if (!showAddress)
+    return;
 
   if (!fixedIP && addresses.isEmpty() && !serverStarted || (serverStarted && m_serverStartSuggestedIP.isEmpty())) {
     ui->lblIpAddresses->setText(colorText.arg(palette().linkVisited().color().name(), tr("No IP Detected")));

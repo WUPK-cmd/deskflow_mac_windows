@@ -11,14 +11,21 @@
 #include "arch/ArchException.h"
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "io/StreamFilter.h"
 #include "mt/Lock.h"
 #include "net/NetworkAddress.h"
 #include "net/SocketException.h"
 #include "net/SocketMultiplexer.h"
 #include "net/TSocketMultiplexerMethodJob.h"
 
+#include <QHostAddress>
+
 #include <cstdlib>
 #include <cstring>
+
+#ifndef Q_OS_WIN
+#include <netinet/in.h>
+#endif
 
 static const std::size_t s_maxInputBufferSize = 1024 * 1024;
 
@@ -68,6 +75,48 @@ TCPSocket::~TCPSocket()
   } catch (...) {
     LOG_DEBUG("error while TCP socket destruction");
   }
+}
+
+QPair<QString, QString> TCPSocket::connectionAddresses(deskflow::IStream *stream)
+{
+  while (auto *filter = dynamic_cast<StreamFilter *>(stream))
+    stream = filter->getStream();
+
+  auto *socket = dynamic_cast<TCPSocket *>(stream);
+  if (!socket)
+    return {};
+
+  Lock lock(&socket->m_mutex);
+  if (!socket->m_socket || !socket->m_connected)
+    return {};
+
+#ifdef Q_OS_WIN
+  const auto nativeSocket = socket->m_socket->m_socket;
+  using SocketAddressLength = int;
+#else
+  const auto nativeSocket = socket->m_socket->m_fd;
+  using SocketAddressLength = socklen_t;
+#endif
+
+  const auto readAddress = [nativeSocket](auto readEndpoint) -> QString {
+    sockaddr_storage storage{};
+    auto length = static_cast<SocketAddressLength>(sizeof(storage));
+    const auto address = reinterpret_cast<sockaddr *>(&storage);
+    if (readEndpoint(nativeSocket, address, &length) != 0)
+      return {};
+
+    QHostAddress host(address);
+    if (storage.ss_family == AF_INET6) {
+      const auto scope = reinterpret_cast<const sockaddr_in6 *>(&storage)->sin6_scope_id;
+      if (scope != 0)
+        host.setScopeId(QString::number(scope));
+    }
+    return host.toString();
+  };
+
+  const auto local = readAddress(::getsockname);
+  const auto peer = readAddress(::getpeername);
+  return local.isEmpty() || peer.isEmpty() ? QPair<QString, QString>{} : qMakePair(local, peer);
 }
 
 void TCPSocket::bind(const NetworkAddress &addr)

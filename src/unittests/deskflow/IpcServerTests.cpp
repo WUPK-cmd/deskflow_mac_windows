@@ -210,14 +210,17 @@ void IpcServerTests::replaysCurrentStateToEveryClient()
   first.write(QStringLiteral("hello=%1\n").arg(kIpcVersionId).toUtf8());
   QTRY_VERIFY(first.bytesAvailable() > 0);
   server.broadcastCommand(QStringLiteral("connectionState"), QStringLiteral("Connected"));
+  const auto addresses = QStringLiteral(R"([["192.0.2.1","192.0.2.2"]])");
+  server.broadcastCommand(QStringLiteral("connectionAddresses"), addresses);
   server.broadcastCommand(QStringLiteral("connectedClients"), QStringLiteral("laptop"));
   server.broadcastCommand(QStringLiteral("secureSocket"), QStringLiteral("TLSv1.3"));
 
   deskflow::gui::ipc::CoreIpcClient second(nullptr, name);
   QSignalSpy received(&second, &deskflow::gui::ipc::CoreIpcClient::commandReceived);
   second.connectToServer();
-  QTRY_COMPARE(received.size(), 3);
+  QTRY_COMPARE(received.size(), 4);
   QVERIFY(received.contains({QStringLiteral("connectionState"), QStringLiteral("Connected")}));
+  QVERIFY(received.contains({QStringLiteral("connectionAddresses"), addresses}));
   QVERIFY(received.contains({QStringLiteral("connectedClients"), QStringLiteral("laptop")}));
   QVERIFY(received.contains({QStringLiteral("secureSocket"), QStringLiteral("TLSv1.3")}));
 }

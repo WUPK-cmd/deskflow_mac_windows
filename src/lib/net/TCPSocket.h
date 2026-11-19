@@ -14,6 +14,9 @@
 #include "mt/Mutex.h"
 #include "net/IDataSocket.h"
 
+#include <QPair>
+#include <QString>
+
 class Mutex;
 class Thread;
 class ISocketMultiplexerJob;
@@ -38,6 +41,10 @@ public:
 
   TCPSocket &operator=(TCPSocket const &) = delete;
   TCPSocket &operator=(TCPSocket &&) = delete;
+
+  // Reads the local and peer addresses from the live TCP socket below the stream filters.
+  // An unavailable connection or unsupported stream returns an empty pair.
+  static QPair<QString, QString> connectionAddresses(deskflow::IStream *stream);
 
   // ISocket overrides
   void bind(const NetworkAddress &) override;

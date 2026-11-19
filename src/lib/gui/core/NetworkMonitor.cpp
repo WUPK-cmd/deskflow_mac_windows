@@ -136,6 +136,33 @@ QStringList NetworkMonitor::validAddresses()
   return ipList;
 }
 
+QString NetworkMonitor::interfaceForAddress(const QHostAddress &address)
+{
+  const auto scope = address.scopeId();
+  auto unscoped = address;
+  unscoped.setScopeId({});
+  const auto interfaces = QNetworkInterface::allInterfaces();
+  QString result;
+  for (const auto &interface : interfaces) {
+    if (!(interface.flags() & QNetworkInterface::IsUp))
+      continue;
+    if (!scope.isEmpty() && scope != interface.name() && scope != QString::number(interface.index()))
+      continue;
+    const auto entries = interface.addressEntries();
+    const auto matches = std::ranges::any_of(entries, [&unscoped](const QNetworkAddressEntry &entry) {
+      auto candidate = entry.ip();
+      candidate.setScopeId({});
+      return candidate.isEqual(unscoped, QHostAddress::ConvertV4MappedToIPv4);
+    });
+    if (!matches)
+      continue;
+    if (!result.isEmpty())
+      return {};
+    result = interface.humanReadableName();
+  }
+  return result;
+}
+
 void NetworkMonitor::setIpAddresses(const QStringList &newAddresses)
 {
   if (newAddresses == m_lastAddresses)

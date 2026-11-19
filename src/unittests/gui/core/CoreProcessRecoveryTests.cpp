@@ -52,8 +52,10 @@ public:
             commands.append(line);
             if (line.startsWith("hello=")) {
               socket->write(QByteArray("hello=") + kIpcVersionId + "\n");
-              if (m_core)
+              if (m_core) {
+                socket->write("connectionAddresses=" + addresses + "\n");
                 socket->write("connectionState=Connected\nconnectedClients=laptop\nsecureSocket=TLSv1.3\n");
+              }
             } else if (line.startsWith("start=") && replyToStart) {
               const auto id = line.split('=').at(1);
               socket->write("startResult=" + id + "=ok\n");
@@ -88,6 +90,7 @@ public:
   QList<QLocalSocket *> sockets;
   bool replyToStop = true;
   bool replyToStart = true;
+  QByteArray addresses = R"([["192.168.250.1","192.168.250.2"]])";
 
 private:
   bool m_core;
@@ -166,10 +169,20 @@ void CoreProcessRecoveryTests::reconnectsAfterWatchdogReplacement()
   process.setMode(Settings::CoreMode::Client);
   process.start(Settings::ProcessMode::Service);
   QTRY_COMPARE_WITH_TIMEOUT(process.connectionState(), ConnectionState::Connected, 4000);
+  const QList<QPair<QString, QString>> wired{{"192.168.250.1", "192.168.250.2"}};
+  QCOMPARE(process.connectionAddresses(), wired);
   core.dropConnections();
   QTRY_COMPARE(process.connectionState(), ConnectionState::Disconnected);
+  QVERIFY(process.connectionAddresses().isEmpty());
   Peer replacement(coreName, true);
+  replacement.addresses = R"([["invalid","192.0.2.2"],["fd00::1","fd00::2"],["192.0.2.1","192.0.2.2"]])";
   QTRY_COMPARE_WITH_TIMEOUT(process.connectionState(), ConnectionState::Connected, 7000);
+  const QList<QPair<QString, QString>> reconnected{{"fd00::1", "fd00::2"}, {"192.0.2.1", "192.0.2.2"}};
+  QCOMPARE(process.connectionAddresses(), reconnected);
+  QVERIFY(!replacement.sockets.isEmpty());
+  replacement.sockets.last()->write("connectionAddresses=[]\nconnectionState=Listening\n");
+  QTRY_COMPARE(process.connectionState(), ConnectionState::Listening);
+  QVERIFY(process.connectionAddresses().isEmpty());
   QCOMPARE(process.processState(), ProcessState::Started);
   QCOMPARE(daemon.starts(), 1); // watchdog owns the replacement, GUI must adopt it
   process.stop(Settings::ProcessMode::Service);

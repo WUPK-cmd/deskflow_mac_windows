@@ -8,7 +8,10 @@
 
 #include "common/Enums.h"
 
+#include <QList>
+#include <QPair>
 #include <QString>
 
 void ipcSendToClient(const QString &command, const QString &args = "");
 void ipcSendConnectionState(deskflow::core::ConnectionState state);
+void ipcSendConnectionAddresses(const QList<QPair<QString, QString>> &addresses);

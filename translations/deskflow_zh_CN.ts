@@ -701,7 +701,7 @@ Valid names:
     </message>
     <message>
         <source>Suggested IP: </source>
-        <translation>可连接地址：</translation>
+        <translation>建议连接地址：</translation>
     </message>
     <message>
         <source>&amp;Configure Client</source>
@@ -922,6 +922,14 @@ Additionally, check you are able to %1 the server config file: %2</source>
     <message>
         <source>On the other computer, choose Receive and enter this computer&apos;s name or IP address.</source>
         <translation>在另一台电脑选择“接收键鼠”，并填写本机名称或 IP 地址。</translation>
+    </message>
+    <message>
+        <source>Active connection: %1</source>
+        <translation>实际连接：%1</translation>
+    </message>
+    <message>
+        <source>Active connections: %1</source>
+        <translation>当前连接数：%1</translation>
     </message>
     <message>
         <source>Waiting for server</source>

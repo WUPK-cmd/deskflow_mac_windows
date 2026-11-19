@@ -14,6 +14,7 @@
 
 #include <QMutex>
 #include <QObject>
+#include <QPair>
 #include <QProcess>
 #include <QTimer>
 
@@ -72,6 +73,10 @@ public:
   {
     return m_connectionState;
   }
+  const QList<QPair<QString, QString>> &connectionAddresses() const
+  {
+    return m_connectionAddresses;
+  }
 
   // setters
   void setAddress(const QString &address)
@@ -91,6 +96,7 @@ Q_SIGNALS:
   void secureSocket(bool enabled);
   void daemonIpcClientConnectionFailed();
   void connectedClientsChanged(const QStringList &clients);
+  void connectionAddressesChanged();
   void securityLevelChanged(QString securityLevel);
   void unrecognisedClient(const QString &clientName);
   void connectionRefused(deskflow::core::ConnectionRefusal reason);
@@ -131,6 +137,7 @@ private:
   QString m_address;
   ProcessState m_processState = ProcessState::Stopped;
   ConnectionState m_connectionState = ConnectionState::Disconnected;
+  QList<QPair<QString, QString>> m_connectionAddresses;
   Settings::CoreMode m_mode = Settings::CoreMode::None;
   QMutex m_processMutex;
   QString m_secureSocketVersion;

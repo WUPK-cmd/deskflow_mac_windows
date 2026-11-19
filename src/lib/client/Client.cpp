@@ -174,6 +174,7 @@ void Client::handshakeComplete()
   if (m_relativeMouseMoves && !m_hasRelativeRestorePosition) {
     saveRelativeRestorePosition();
   }
+  ipcSendConnectionAddresses({TCPSocket::connectionAddresses(m_stream)});
   sendEvent(EventTypes::ClientConnected);
 }
 
@@ -568,6 +569,7 @@ void Client::cleanupConnection()
   m_microphonePaused = false;
   updateMicrophoneRoute();
   if (m_stream != nullptr) {
+    ipcSendConnectionAddresses({});
     using enum EventTypes;
     m_events->removeHandler(StreamInputReady, m_stream->getEventTarget());
     m_events->removeHandler(StreamOutputError, m_stream->getEventTarget());

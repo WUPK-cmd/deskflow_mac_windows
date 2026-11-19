@@ -7,7 +7,10 @@
 #include "CoreIpc.h"
 
 #include "CoreIpcServer.h"
+#include "common/Constants.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QMetaEnum>
 
 void ipcSendToClient(const QString &command, const QString &args)
@@ -25,4 +28,19 @@ void ipcSendConnectionState(deskflow::core::ConnectionState state)
 {
   const auto metaEnum = QMetaEnum::fromType<deskflow::core::ConnectionState>();
   ipcSendToClient(QStringLiteral("connectionState"), metaEnum.valueToKey(static_cast<int>(state)));
+}
+
+void ipcSendConnectionAddresses(const QList<QPair<QString, QString>> &addresses)
+{
+  QJsonArray paths;
+  for (const auto &[local, remote] : addresses) {
+    if (!local.isEmpty() && !remote.isEmpty())
+      paths.append(QJsonArray{local, remote});
+  }
+  auto payload = QJsonDocument(paths).toJson(QJsonDocument::Compact);
+  const auto command = QStringLiteral("connectionAddresses");
+  // A diagnostic snapshot must never exceed the local IPC frame limit.
+  if (command.size() + payload.size() + 2 > kMaxIpcMessageSize)
+    payload = QByteArrayLiteral("[]");
+  ipcSendToClient(command, QString::fromUtf8(payload));
 }
